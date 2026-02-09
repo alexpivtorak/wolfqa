@@ -1,0 +1,139 @@
+{
+  "b468cf459bc3832838e21c7fd37785ee": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Clicking the 'More information...' link",
+        "selector": "a",
+        "coordinate": {
+          "x": 229,
+          "y": 287
+        },
+        "intent": "More information..."
+      },
+      {
+        "type": "done",
+        "reason": "The page navigated after clicking the link in the previous step."
+      }
+    ],
+    "timestamp": 1770594841310,
+    "hitCount": 1
+  },
+  "f1583f794852f1f5d1edc76280b39ba1": {
+    "actions": [
+      {
+        "type": "type",
+        "reason": "Input username",
+        "selector": "[data-test='username']",
+        "text": "standard_user"
+      },
+      {
+        "type": "type",
+        "reason": "Input password",
+        "selector": "#password",
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the login button to submit the form",
+        "selector": "[data-test='login-button']"
+      },
+      {
+        "type": "done",
+        "reason": "login success, inventory page loaded"
+      }
+    ],
+    "timestamp": 1770595131032,
+    "hitCount": 2
+  },
+  "785bff968bd296e112988c9bccbdff40": {
+    "actions": [
+      {
+        "type": "scroll",
+        "reason": "Scroll to the bottom of the page and verify that footer is visible",
+        "direction": "down"
+      },
+      {
+        "type": "done",
+        "reason": "Footer is visible after scrolling to the bottom",
+        "selector": null
+      }
+    ],
+    "timestamp": 1770595134820,
+    "hitCount": 2
+  },
+  "7eb718b0ed519e22839dc64a3262abfc": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Add the 'Sauce Labs Backpack' to the cart",
+        "selector": "#add-to-cart-sauce-labs-backpack"
+      },
+      {
+        "type": "done",
+        "reason": "The 'Sauce Labs Backpack' is already in the cart. The button text is 'Remove'."
+      }
+    ],
+    "timestamp": 1770595141096,
+    "hitCount": 2
+  },
+  "2fbea4e1c72852aadace005b8576f638": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click the shopping cart icon to view cart",
+        "selector": "[data-test='shopping-cart-link']"
+      },
+      {
+        "type": "done",
+        "reason": "Click the shopping cart icon to view cart"
+      }
+    ],
+    "timestamp": 1770595147366,
+    "hitCount": 2
+  },
+  "061f9f6bf48a1318de94bd8df7f59414": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click Checkout",
+        "selector": "[data-test='checkout']"
+      },
+      {
+        "type": "type",
+        "reason": "Input first name",
+        "selector": "#first-name",
+        "text": "John"
+      },
+      {
+        "type": "type",
+        "reason": "Input last name",
+        "selector": "[name='lastName']",
+        "text": "Doe"
+      },
+      {
+        "type": "type",
+        "reason": "Input postal code",
+        "selector": "#postal-code",
+        "text": "12345"
+      },
+      {
+        "type": "click",
+        "reason": "Click Continue",
+        "selector": "[data-test='continue']"
+      },
+      {
+        "type": "click",
+        "reason": "Click Finish",
+        "selector": "#finish"
+      },
+      {
+        "type": "done",
+        "reason": "The order is complete.",
+        "selector": "#back-to-products"
+      }
+    ],
+    "timestamp": 1770595165996,
+    "hitCount": 2
+  }
+}

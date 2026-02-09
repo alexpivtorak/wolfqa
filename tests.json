@@ -1,0 +1,140 @@
+[
+    {
+        "id": "sauce-flow",
+        "name": "SauceDemo Purchase Flow",
+        "url": "https://www.saucedemo.com",
+        "steps": [
+            {
+                "name": "Login",
+                "goal": "Login with user 'standard_user' and password 'secret_sauce'"
+            },
+            {
+                "name": "Scroll to the bottom of the page",
+                "goal": "Scroll to the bottom of the page and verify that footer is visible"
+            },
+            {
+                "name": "Add to Cart",
+                "goal": "Add the 'Sauce Labs Backpack' to the cart"
+            },
+            {
+                "name": "Go to Cart",
+                "goal": "Click the shopping cart icon to view cart"
+            },
+            {
+                "name": "Checkout",
+                "goal": "Click Checkout"
+            }
+        ]
+    },
+    {
+        "id": "bstack-flow",
+        "name": "StackDemo Purchase Flow",
+        "url": "https://bstackdemo.com/",
+        "steps": [
+            {
+                "name": "Add to Cart",
+                "goal": "Add 'iPhone 12' to the cart"
+            },
+            {
+                "name": "Checkout",
+                "goal": "Click the Checkout button"
+            },
+            {
+                "name": "Login",
+                "goal": "Type username 'demouser' and password 'testingisfun99', then click Log In"
+            },
+            {
+                "name": "Shipping Address",
+                "goal": "Type address info (First Name: 'Test', Last Name: 'User', Address: '123 Main St', State: 'State', Postal Code: '12345') and click Submit"
+            }
+        ]
+    },
+    {
+        "id": "demoqa-form",
+        "name": "DemoQA - Practice Form",
+        "url": "https://demoqa.com/automation-practice-form",
+        "steps": [
+            {
+                "name": "Fill Personal Info",
+                "goal": "Fill the first name 'John' and last name 'Doe'"
+            },
+            {
+                "name": "Fill Contact",
+                "goal": "Enter email 'john@test.com' and mobile number '1234567890'"
+            },
+            {
+                "name": "Select Gender",
+                "goal": "Select 'Male' gender radio button"
+            },
+            {
+                "name": "Submit Form",
+                "goal": "Click the Submit button"
+            }
+        ]
+    },
+    {
+        "id": "parabank-register",
+        "name": "Parabank - User Registration",
+        "url": "https://parabank.parasoft.com/parabank/register.htm",
+        "steps": [
+            {
+                "name": "Fill Registration",
+                "goal": "Fill the registration form with First Name 'Test', Last Name 'User', Address '123 Main St', City 'Boston', State 'MA', Zip '02101', Phone '555-1234', SSN '123-45-6789'"
+            },
+            {
+                "name": "Set Credentials",
+                "goal": "Enter Username 'testuser123' and Password 'password123', then confirm password"
+            },
+            {
+                "name": "Submit",
+                "goal": "Click the Register button"
+            }
+        ]
+    },
+    {
+        "id": "google-search",
+        "name": "Google Search Test",
+        "url": "https://www.google.com",
+        "steps": [
+            {
+                "name": "Search",
+                "goal": "Type 'Trump is crazy' in the search box and press Enter"
+            },
+            {
+                "name": "Verify Results",
+                "goal": "Verify that correct search results are displayed on the page"
+            }
+        ]
+    },
+    {
+        "id": "vivino-wine",
+        "name": "Vivino Wine Purchase Test",
+        "url": "https://www.vivino.com",
+        "steps": [
+            {
+                "name": "Search Wine",
+                "goal": "Search for 'San Marzano 62 Anniversario Primitivo di Manduria Riserva 2019'"
+            },
+            {
+                "name": "Select Wine",
+                "goal": "Click on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results"
+            },
+            {
+                "name": "Adjust Quantity",
+                "goal": "Adjust the quantity to exactly 3 bottles. Look at the current number in the quantity picker and click '+' or '-' until it shows 3."
+            },
+            {
+                "name": "Add these three bottles to the cart",
+                "goal": "Add these three bottles to the cart"
+            },
+            {
+                "name": "Go to Cart",
+                "goal": "Go to the shopping cart"
+            },
+            {
+                "name": "Verify Cart",
+                "goal": "Verify that 'San Marzano 62 Anniversario' wine appears in the cart with quantity 3"
+            }
+        ]
+    }
+]

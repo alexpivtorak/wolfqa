@@ -1,0 +1,48 @@
+{
+  "name": "wolfqa",
+  "version": "1.0.0",
+  "description": "Agentic QA Tester using Playwright and Google Gemini",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:worker": "tsx src/worker/index.ts",
+    "test": "playwright test",
+    "test:manual": "tsx src/scripts/test-agent.ts",
+    "test:chaos": "tsx src/scripts/test-agent.ts",
+    "trigger": "tsx src/scripts/trigger-job.ts",
+    "trigger:chaos": "tsx src/scripts/trigger-job.ts",
+    "trigger:flow": "tsx src/scripts/trigger-flow.ts",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:push": "drizzle-kit push:pg",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "ai",
+    "qa",
+    "playwright",
+    "gemini",
+    "automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.12.0",
+    "bullmq": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.30.10",
+    "pg": "^8.11.5",
+    "playwright": "^1.50.0",
+    "winston": "^3.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/pg": "^8.11.5",
+    "drizzle-kit": "^0.20.14",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
+  }
+}

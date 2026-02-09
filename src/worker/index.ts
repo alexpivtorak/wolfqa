@@ -1,0 +1,272 @@
+import { Worker, Job } from 'bullmq';
+import { BrowserController } from '../agent/BrowserController.js';
+import { VisionBrain } from '../agent/VisionBrain.js';
+import { Observer } from '../agent/Observer.js';
+import { ActionCache } from '../agent/ActionCache.js';
+import { db } from '../db/index.js';
+import { testRuns, issues } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import dotenv from 'dotenv';
+import { Action, TestFlow } from '../agent/types.js';
+import fs from 'fs';
+import path from 'path';
+
+dotenv.config();
+
+const connection = {
+    url: process.env.REDIS_URL || 'redis://localhost:6379'
+};
+
+const worker = new Worker('test-queue', async (job: Job) => {
+    // Support both single goal and multi-step flow
+    const { url, goal, flow, testRunId, mode } = job.data;
+    // flow: TestFlow | undefined
+
+    const testName = flow ? flow.name : goal;
+    console.log(`Processing job ${job.id}: ${testName} [${mode || 'standard'}] on ${url}`);
+
+    await db.update(testRuns).set({ status: 'running' }).where(eq(testRuns.id, testRunId));
+
+    const browser = new BrowserController();
+    const brain = new VisionBrain();
+    const observer = new Observer();
+    const actionCache = new ActionCache();
+    const history: string[] = [];
+
+    try {
+        await browser.launch();
+        await browser.startSession(job.id || 'unknown');
+        await browser.navigate(url);
+
+        // --- MONITORING & CHAOS SETUP ---
+        const pageErrors: string[] = [];
+        const failedRequests: string[] = [];
+        const consoleLogs: string[] = [];
+
+        if (browser.page) {
+            browser.page.on('console', msg => consoleLogs.push(`[CONSOLE] ${msg.type()}: ${msg.text()}`));
+            browser.page.on('pageerror', err => {
+                const msg = `[PAGE ERROR] ${err.message}`;
+                console.error(msg);
+                pageErrors.push(msg);
+                history.push(msg);
+            });
+            browser.page.on('response', resp => {
+                if (resp.status() >= 500) {
+                    const msg = `[SERVER ERROR] ${resp.status()} on ${resp.url()}`;
+                    console.error(msg);
+                    failedRequests.push(msg);
+                    history.push(msg);
+                }
+            });
+        }
+
+        if (mode === 'chaos') {
+            console.log('🔥 enabling CHAOS MODE');
+            await browser.enableChaos();
+            history.push('🔥 CHAOS MODE ENABLED: Gremlins active (Latency + Packet Loss)');
+        }
+
+        // Normalize to a list of steps
+        const steps = flow ? flow.steps : [{ name: 'Main Goal', goal: goal }];
+
+        let flowSuccess = true;
+
+        for (let i = 0; i < steps.length; i++) {
+            const currentStep = steps[i];
+            console.log(`--- Executing Step ${i + 1}/${steps.length}: ${currentStep.name} ---`);
+            history.push(`\n--- STEP ${i + 1}: ${currentStep.name} (${currentStep.goal}) ---`);
+
+            // Reset observer for new step
+            observer.resetForNewStep();
+
+            let stepSuccess = false;
+            let stepLoopCount = 0;
+            const MAX_STEPS_PER_GOAL = mode === 'chaos' ? 50 : 15;
+
+            // --- CACHE CHECK ---
+            const currentUrl = browser.page?.url() || url; // simple approximation
+            const cachedActions = actionCache.get(currentUrl, currentStep.name, currentStep.goal);
+
+            // Disable cache in Chaos Mode to avoid replaying "happy path"
+            if (mode !== 'chaos' && cachedActions && cachedActions.length > 0) {
+                console.log(`⚡ Attempting ${cachedActions.length} cached actions for step "${currentStep.name}"`);
+                try {
+                    for (const action of cachedActions) {
+                        if (action.type === 'done') continue; // Don't execute 'done', just finish loop
+
+                        // Execute blindly (fast)
+                        console.log(`⚡ Executing cached: ${action.type} ${action.selector || action.text || ''}`);
+                        await browser.executeAction(action);
+
+                        // Small wait to ensure stability
+                        await browser.page?.waitForTimeout(500);
+                    }
+                    console.log(`✅ Cached execution successful for step "${currentStep.name}"`);
+                    history.push(`[CACHE] Successfully executed ${cachedActions.length} actions.`);
+                    stepSuccess = true;
+                    continue; // Skip to next step
+                } catch (e) {
+                    console.warn(`❌ Cached execution failed: ${e}. Falling back to Vision.`);
+                    history.push(`[CACHE] Failed: ${e}. Recovering with Vision.`);
+                    // Fallthrough to standard Vision loop
+                }
+            }
+
+            // --- STANDARD VISION LOOP ---
+            const stepActions: Action[] = []; // Track actions for caching
+
+            // Sub-loop for the specific step
+            while (stepLoopCount < MAX_STEPS_PER_GOAL) {
+                const screenshot = await browser.getScreenshot();
+
+                // Save screenshot for debugging
+                const screenshotDir = './artifacts/screenshots';
+                if (!fs.existsSync(screenshotDir)) {
+                    fs.mkdirSync(screenshotDir, { recursive: true });
+                }
+                const screenshotPath = path.join(screenshotDir, `${testRunId}_step${i + 1}_action${stepLoopCount}.jpg`);
+                fs.writeFileSync(screenshotPath, screenshot);
+
+                const pageContext = await browser.getPageContext();
+
+                let action: Action;
+                if (mode === 'chaos') {
+                    action = await brain.decideChaosAction(screenshot, history);
+                } else {
+                    action = await brain.decideAction(screenshot, currentStep.goal, history, pageContext);
+                }
+
+                stepActions.push(action); // Record action (including done/fail)
+                history.push(`Action=${action.type} Reason=${action.reason || ''}`);
+
+                if (action.type === 'done') {
+                    // Cache successful actions (excluding the 'done' action itself if preferred, but keeping it is fine)
+
+                    if (mode === 'chaos') {
+                        // In Chaos mode, "done" means we decided to stop this step (maybe looped enough)
+                        // It doesn't necessarily mean "goal reached", but "no crash occurred".
+                        stepSuccess = true;
+                        break;
+                    }
+
+                    // We only cache if we actually did something useful
+                    if (stepActions.length > 1) {
+                        // Use the URL from start of step (approx)
+                        actionCache.set(currentUrl, currentStep.name, currentStep.goal, stepActions);
+                    }
+                    stepSuccess = true;
+                    break;
+                }
+
+                if (action.type === 'fail') {
+                    if (mode === 'chaos') {
+                        throw new Error(`Chaos crash at step ${currentStep.name}: ${action.reason}`);
+                    }
+                    throw new Error(`Failed at step ${currentStep.name}: ${action.reason}`);
+                }
+
+                await browser.executeAction(action);
+
+                // Wait for page to stabilize after action (prevents screenshot errors during navigation)
+                try {
+                    await browser.page?.waitForLoadState('domcontentloaded', { timeout: 3000 });
+                } catch { }
+
+                // Record state in Observer
+                const currentUrlObs = browser.page?.url() || '';
+                observer.recordState(currentUrlObs, action);
+
+                // Check for stuck states
+                const intervention = observer.validateProgress();
+
+                // CRITICAL CHAOS CHECK
+                if (mode === 'chaos') {
+                    if (pageErrors.length > 0 || failedRequests.length > 0) {
+                        throw new Error(`CRASH DETECTED! ${pageErrors.length} Page Errors, ${failedRequests.length} Failed Requests.`);
+                    }
+                }
+
+                if (intervention) {
+                    console.warn(`⚠️ Observer Intervention: ${intervention}`);
+                    history.push(`OBSERVER: ${intervention}`);
+                    // Force fail to prevent infinite loops
+                    throw new Error(`Observer detected issue: ${intervention}`);
+                }
+
+                // Periodically update DB logs
+                if (stepLoopCount % 3 === 0) {
+                    await db.update(testRuns).set({
+                        logs: JSON.stringify(history)
+                    }).where(eq(testRuns.id, testRunId));
+                }
+                stepLoopCount++;
+            }
+
+            if (!stepSuccess) {
+                throw new Error(`Timeout: Step ${currentStep.name} not completed within limit`);
+            }
+
+            // Validate step completion
+            const stepValidation = observer.validateStepCompletion(currentStep.name);
+            if (stepValidation) {
+                console.warn(`⚠️ Observer: ${stepValidation}`);
+                history.push(`OBSERVER: ${stepValidation}`);
+                throw new Error(stepValidation);
+            }
+        }
+
+        const tempVideoPath = await browser.closeSession();
+        let finalVideoPath: string | undefined;
+
+        if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const newFilename = `${timestamp}_${testRunId}.webm`;
+            const videoDir = path.dirname(tempVideoPath);
+            finalVideoPath = path.join(videoDir, newFilename);
+
+            // Rename file
+            fs.renameSync(tempVideoPath, finalVideoPath);
+            console.log(`Video saved to ${finalVideoPath}`);
+        }
+
+        await db.update(testRuns).set({
+            status: 'completed',
+            result: 'pass',
+            logs: JSON.stringify(history),
+            videoUrl: finalVideoPath || undefined
+        }).where(eq(testRuns.id, testRunId));
+
+    } catch (error: any) {
+        console.error(`Job failed: ${error}`);
+        const tempVideoPath = await browser.closeSession();
+        let finalVideoPath: string | undefined;
+
+        if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const newFilename = `${timestamp}_${testRunId}.webm`;
+            const videoDir = path.dirname(tempVideoPath);
+            finalVideoPath = path.join(videoDir, newFilename);
+            fs.renameSync(tempVideoPath, finalVideoPath);
+            console.log(`Video saved to ${finalVideoPath}`);
+        }
+
+        await db.update(testRuns).set({
+            status: 'failed',
+            result: 'fail',
+            logs: JSON.stringify([...history, `ERROR: ${error.message}`]),
+            videoUrl: finalVideoPath || undefined
+        }).where(eq(testRuns.id, testRunId));
+
+        await db.insert(issues).values({
+            testRunId: testRunId,
+            description: error.message || 'Unknown error',
+            severity: 'high'
+        });
+    } finally {
+        await browser.cleanup();
+    }
+
+}, { connection });
+
+console.log('Worker started, listening for jobs...');
