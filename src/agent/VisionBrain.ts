@@ -1,8 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Action } from './types.js';
+import { testSteps } from '../db/schema.js';
+import { db } from '../db/index.js';
 import dotenv from 'dotenv';
+import Redis from 'ioredis';
 
 dotenv.config();
+
+// Redis Publisher for inter-process communication
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export class VisionBrain {
     private genAI: GoogleGenerativeAI;
@@ -12,23 +18,32 @@ export class VisionBrain {
         const key = apiKey || process.env.GOOGLE_API_KEY;
         if (!key) throw new Error('GOOGLE_API_KEY is required');
         this.genAI = new GoogleGenerativeAI(key);
-        this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        // Using 2.0 Flash Lite as 1.5 Flash returned 404
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        console.log(`🤖 VisionBrain initialized with model: ${modelName}`);
+        this.model = this.genAI.getGenerativeModel({ model: modelName });
     }
 
-    async decideAction(screenshot: Buffer, goal: string, history: string[], pageContext?: string, domDiff?: string): Promise<Action> {
+    async decideAction(screenshot: Buffer, goal: string, history: string[], pageContext?: string, domDiff?: string, runId?: number): Promise<Action> {
         const contextSection = pageContext ? `
       
-      PAGE CONTEXT (use this to find exact selectors):
+      PAGE CONTEXT (Distilled DOM):
+      The page context is provided as a compressed JSON list of interactive elements.
+      - t: tag name (btn=button, inp=input, etc.)
+      - c: [x, y] center coordinates (USE THESE for precise clicking)
+      - txt: visible text or value
+      - dt: data-test or data-testid
+      - l: label/aria-label/placeholder
+      - id: element id
+      
       ${pageContext}
       
-      SELECTOR PRIORITY (use the first available):
-      1. data-test or data-testid: [data-test='value'] or [data-testid='value']
-      2. id attribute: #elementId (note: if ID has dots like "customer.firstName", use [id='customer.firstName'])
-      3. name attribute: [name='fieldName']
-      4. aria-label: [aria-label='Button text']
-      5. Text content for buttons: Use coordinates if text is visible
+      SELECTOR PRIORITY:
+      1. Coordinate: { "coordinate": { "x": 123, "y": 456 } } (Highly reliable, use 'c' values from context)
+      2. data-test/id: [data-test='value']
+      3. Text/Label: Use text content if unique.
       
-      IMPORTANT: Always prefer selectors over coordinates for form inputs.
+      IMPORTANT: If an element has coordinates 'c', PREFER using "coordinate": { "x": ..., "y": ... } over selectors.
       ` : '';
 
         // Add DOM diff info if available
@@ -39,6 +54,10 @@ export class VisionBrain {
       
       Use this to verify if your last action had an effect. If "No changes detected" after multiple clicks, try a different approach.
       ` : '';
+
+        if (runId) {
+            redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'thought', message: 'Analyzing page state...' }));
+        }
 
         const prompt = `
       You are an automated QA tester acting as a user. 
@@ -69,10 +88,11 @@ ${contextSection}${diffSection}
       7. IMPORTANT: If a button is hidden or covered by an overlay, use "keypress" with "Enter" instead of trying to click it.
 
       CRITICAL ANTI-LOOP RULES:
-      8. **DO NOT CLEAR OR RETYPE**: If an input field ALREADY contains the correct text you need, DO NOT clear it or retype. Move to the NEXT action.
-      9. **PROGRESS FORWARD**: After typing, the next step is usually "keypress" with "Enter" or clicking a visible submit button.
-      10. **DETECT SUCCESS**: If the page has visually changed (new content, different URL), the goal is likely DONE.
-      11. **LOOP DETECTION**: If history shows you attempted the same action 2+ times, STOP. Either return "done" if goal seems achieved, or "fail" if truly stuck.
+      8. **INTERACTION TRANSITION**: If you just clicked an input field (search, login), your NEXT action MUST be "type". Do not click it again.
+      9. **DO NOT CLEAR OR RETYPE**: If an input field ALREADY contains the correct text you need, DO NOT clear it or retype. Move to the NEXT action.
+      10. **PROGRESS FORWARD**: After typing, the next step is usually "keypress" with "Enter" or clicking a visible submit button.
+      11. **DETECT SUCCESS**: If the page has visually changed (new content, different URL), the goal is likely DONE.
+      12. **LOOP DETECTION**: If history shows you attempted the same action 2+ times, STOP. Either return "done" if goal seems achieved, or "fail" if truly stuck.
     `;
 
         return this.generateAction(prompt, screenshot);
@@ -136,7 +156,7 @@ ${contextSection}${diffSection}
         return action;
     }
 
-    private async generateAction(prompt: string, screenshot: Buffer): Promise<Action> {
+    private async generateAction(prompt: string, screenshot: Buffer, runId?: number): Promise<Action> {
         // Convert Buffer to base64
         const imagePart = {
             inlineData: {
@@ -145,23 +165,56 @@ ${contextSection}${diffSection}
             },
         };
 
-        try {
-            const result = await this.model.generateContent([prompt, imagePart]);
-            const response = result.response;
-            const text = response.text();
+        let retries = 3;
+        let delay = 2000;
 
-            console.log('Gemini Response:', text);
+        while (retries > 0) {
+            try {
+                const result = await this.model.generateContent([prompt, imagePart]);
+                const response = result.response;
+                const text = response.text();
 
-            // Extract JSON from potential markdown or text wrapper
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new Error("No JSON found in response");
+                console.log('Gemini Response:', text);
+
+                // Extract JSON from potential markdown or text wrapper
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error("No JSON found in response");
+                }
+
+                const action = JSON.parse(jsonMatch[0]) as Action;
+
+                if (runId) {
+                    redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'step', action, timestamp: new Date() }));
+
+                    // Persist to DB immediately
+                    // await db.insert(testSteps).values({
+                    //    runId,
+                    //    stepNumber: history.length + 1, // approximate
+                    //    actionType: action.type,
+                    //    thought: action.reason,
+                    //    selector: action.selector,
+                    //    // screenshotUrl: ... (handled by worker)
+                    //    domSnapshot: {} // (handled by worker)
+                    // });
+                }
+
+                return action;
+            } catch (error: any) {
+                console.error(`VisionBrain Error (Attempts left: ${retries}):`, error);
+
+                if (error.message?.includes('429') || error.status === 429) {
+                    console.log(`⏳ Rate limited. Waiting ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // Exponential backoff
+                    retries--;
+                } else {
+                    // Non-retriable error
+                    return { type: 'wait', duration: 2000, reason: `Brain error: ${error.message}` };
+                }
             }
-
-            return JSON.parse(jsonMatch[0]) as Action;
-        } catch (error) {
-            console.error('VisionBrain Error:', error);
-            return { type: 'wait', duration: 2000, reason: 'Brain freeze (error)' };
         }
+
+        return { type: 'wait', duration: 5000, reason: 'Brain freeze (rate limited)' };
     }
 }

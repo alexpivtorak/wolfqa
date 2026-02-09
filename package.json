@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:server": "tsx src/server/index.ts",
     "start:worker": "tsx src/worker/index.ts",
     "test": "playwright test",
     "test:manual": "tsx src/scripts/test-agent.ts",
@@ -14,6 +15,7 @@
     "trigger": "tsx src/scripts/trigger-job.ts",
     "trigger:chaos": "tsx src/scripts/trigger-job.ts",
     "trigger:flow": "tsx src/scripts/trigger-flow.ts",
+    "logs": "tsx src/scripts/view-logs.ts",
     "db:generate": "drizzle-kit generate:pg",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
@@ -30,9 +32,12 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.12.0",
+    "@hono/node-server": "^1.19.9",
     "bullmq": "^5.0.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.10",
+    "hono": "^4.11.9",
+    "ioredis": "^5.9.2",
     "pg": "^8.11.5",
     "playwright": "^1.50.0",
     "winston": "^3.13.0",

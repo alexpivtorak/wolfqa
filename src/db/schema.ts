@@ -16,8 +16,23 @@ export const testRuns = pgTable('test_runs', {
     result: text('result'), // 'pass', 'fail'
     logs: jsonb('logs'), // Array of actions/logs
     videoUrl: text('video_url'), // Link to stored video
+    browserConnectUrl: text('browser_connect_url'), // For VNC/Debugger
+    startTime: timestamp('start_time'),
+    endTime: timestamp('end_time'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const testSteps = pgTable('test_steps', {
+    id: serial('id').primaryKey(),
+    runId: integer('run_id').references(() => testRuns.id).notNull(),
+    stepNumber: integer('step_number').notNull(),
+    actionType: text('action_type').notNull(), // click, type, think
+    thought: text('thought'), // The "Why"
+    selector: text('selector'), // The "Where"
+    screenshotUrl: text('screenshot_url'),
+    domSnapshot: jsonb('dom_snapshot'), // Distilled DOM
+    timestamp: timestamp('timestamp').defaultNow(),
 });
 
 export const issues = pgTable('issues', {

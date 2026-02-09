@@ -44,7 +44,7 @@
       }
     ],
     "timestamp": 1770595131032,
-    "hitCount": 2
+    "hitCount": 3
   },
   "785bff968bd296e112988c9bccbdff40": {
     "actions": [
@@ -60,7 +60,7 @@
       }
     ],
     "timestamp": 1770595134820,
-    "hitCount": 2
+    "hitCount": 3
   },
   "7eb718b0ed519e22839dc64a3262abfc": {
     "actions": [
@@ -75,7 +75,7 @@
       }
     ],
     "timestamp": 1770595141096,
-    "hitCount": 2
+    "hitCount": 3
   },
   "2fbea4e1c72852aadace005b8576f638": {
     "actions": [
@@ -90,7 +90,7 @@
       }
     ],
     "timestamp": 1770595147366,
-    "hitCount": 2
+    "hitCount": 3
   },
   "061f9f6bf48a1318de94bd8df7f59414": {
     "actions": [
@@ -134,6 +134,197 @@
       }
     ],
     "timestamp": 1770595165996,
+    "hitCount": 3
+  },
+  "93bf9a58d4df91bd87deceeb78d9f8e0": {
+    "actions": [
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "click",
+        "reason": "Click search box",
+        "coordinate": {
+          "x": 342,
+          "y": 32
+        },
+        "intent": "Search any wine"
+      },
+      {
+        "type": "type",
+        "reason": "Typing the search query in the search box",
+        "selector": "input[l='Search any wine']",
+        "coordinate": {
+          "x": 342,
+          "y": 32
+        },
+        "text": "San Marzano 62 Anniversario Primitivo di Manduria Riserva 2019"
+      },
+      {
+        "type": "keypress",
+        "reason": "Submit the search query",
+        "key": "Enter"
+      },
+      {
+        "type": "type",
+        "reason": "Typing the search query in the search box",
+        "selector": "[l='Search any wine']",
+        "coordinate": {
+          "x": 342,
+          "y": 32
+        },
+        "text": "San Marzano 62 Anniversario Primitivo di Manduria Riserva 2019"
+      },
+      {
+        "type": "keypress",
+        "reason": "Submit the search query",
+        "key": "Enter"
+      },
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "done",
+        "reason": "The search query has returned the correct result.",
+        "selector": null
+      }
+    ],
+    "timestamp": 1770667290494,
+    "hitCount": 11
+  },
+  "28b3413831bfe95b7f06e80c2f6d7a6e": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results",
+        "coordinate": {
+          "x": 640,
+          "y": 460
+        }
+      },
+      {
+        "type": "done",
+        "reason": "The search query has returned the correct result and the product page for San Marzano 62 Anniversario Primitivo di Manduria Riserva is displayed.",
+        "coordinate": {
+          "x": 522,
+          "y": 256
+        },
+        "intent": "Click on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results"
+      }
+    ],
+    "timestamp": 1770667304631,
     "hitCount": 2
+  },
+  "a659334e133704af3f8a235838f7407a": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results",
+        "coordinate": {
+          "x": 640,
+          "y": 120
+        },
+        "intent": "San Marzano 62 Anniversario Primitivo di Manduria Riserva"
+      },
+      {
+        "type": "done",
+        "reason": "The page is showing the details of the selected wine 'San Marzano 62 Anniversario Primitivo di Manduria Riserva'.",
+        "selector": null,
+        "coordinate": null
+      }
+    ],
+    "timestamp": 1770667458158,
+    "hitCount": 6
+  },
+  "e90448a97675a7f46e96e85254054e62": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Decrease the quantity from 6 to 3 by clicking the '-' button three times.",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      },
+      {
+        "type": "click",
+        "reason": "Decrease the quantity from 5 to 3 by clicking the '-' button twice.",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      },
+      {
+        "type": "click",
+        "reason": "Decrease the quantity from 4 to 3 by clicking the '-' button once.",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      },
+      {
+        "type": "done",
+        "reason": "The quantity is already 3.",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      }
+    ],
+    "timestamp": 1770667476600,
+    "hitCount": 8
+  },
+  "9f91ae5aaa4571f790a6784c89e77c6b": {
+    "actions": [
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "click",
+        "reason": "Add these three bottles to the cart",
+        "coordinate": {
+          "x": 1044,
+          "y": 446
+        },
+        "intent": "Add to cart"
+      },
+      {
+        "type": "done",
+        "reason": "The wine is already added to the cart with quantity 3. Goal achieved."
+      }
+    ],
+    "timestamp": 1770667535119,
+    "hitCount": 8
+  },
+  "2fb9d90985b102cc4e73abece46be37f": {
+    "actions": [
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "done",
+        "reason": "The wine is already added to the cart with quantity 3. Goal achieved."
+      }
+    ],
+    "timestamp": 1770667569591,
+    "hitCount": 0
   }
 }

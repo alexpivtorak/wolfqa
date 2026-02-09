@@ -63,7 +63,7 @@ export class BrowserController {
 
         this.page = await this.context.newPage();
         // Enable better hydration/loading detection
-        this.page.setDefaultTimeout(10000);
+        this.page.setDefaultTimeout(60000);
 
         // Attach Chaos Controller (inactive by default)
         await this.chaos.attach(this.page);
@@ -195,94 +195,111 @@ export class BrowserController {
         });
     }
 
+    /**
+     * Advanced DOM Distiller (Level 3)
+     * - Traverses Shadow DOM
+     * - Maps interactive elements to Coordinates
+     * - Optimizes tokens (short keys)
+     */
+    /**
+     * Advanced DOM Distiller (Level 3)
+     * - Traverses Shadow DOM
+     * - Maps interactive elements to Coordinates
+     * - Optimizes tokens (short keys)
+     */
     async getPageContext(): Promise<string> {
         if (!this.page) throw new Error('Session not started');
 
         try {
-            // Extract inputs with enhanced attributes
-            const inputs = await this.page.$$eval('input, textarea, select', (elements) =>
-                elements
-                    .filter(el => {
+            // WE MUST PASS A STRING TO EVALUATE TO AVOID TRANSPILER INJECTION (ReferenceError: __name)
+            // This function is serialized by Playwright, but tsx/esbuild might still inject things if passed as a closure.
+            // Using a string body is the safest way.
+            return await this.page.evaluate(`
+                (() => {
+                    // 1. Helper: Check visibility
+                    function isVisible(el) {
                         const style = window.getComputedStyle(el);
-                        return style.display !== 'none' && style.visibility !== 'hidden';
-                    })
-                    .slice(0, 20)
-                    .map(el => {
-                        // Get all data-* attributes
-                        const dataAttrs: Record<string, string> = {};
-                        Array.from(el.attributes)
-                            .filter(attr => attr.name.startsWith('data-'))
-                            .forEach(attr => dataAttrs[attr.name] = attr.value);
+                        return style.display !== 'none' &&
+                            style.visibility !== 'hidden' &&
+                            style.opacity !== '0' &&
+                            el.getBoundingClientRect().width > 0;
+                    }
 
-                        return {
-                            tag: el.tagName.toLowerCase(),
-                            id: el.id || undefined,
-                            name: el.getAttribute('name') || undefined,
-                            type: el.getAttribute('type') || undefined,
-                            placeholder: el.getAttribute('placeholder') || undefined,
-                            ariaLabel: el.getAttribute('aria-label') || undefined,
-                            ...dataAttrs,
-                            hasValue: el.value ? true : false
+                    // 2. Helper: Traverse Shadow DOM recursively
+                    function getInteractiveElements(root) {
+                        const elements = [];
+                        // Walker is faster than querySelectorAll for full tree
+                        const walker = document.createTreeWalker(root || document, NodeFilter.SHOW_ELEMENT);
+
+                        let node = walker.nextNode();
+                        while (node) {
+                            const el = node;
+
+                            // Check if interactive
+                            const tag = el.tagName.toLowerCase();
+                            const role = el.getAttribute('role');
+                            const isInteractive =
+                                ['input', 'textarea', 'select', 'button', 'a'].includes(tag) ||
+                                role === 'button' ||
+                                role === 'link' ||
+                                role === 'checkbox' ||
+                                role === 'menuitem' ||
+                                el.hasAttribute('onclick');
+
+                            if (isInteractive && isVisible(el)) {
+                                elements.push(el);
+                            }
+
+                            // Traverse Shadow Root
+                            if (el.shadowRoot) {
+                                elements.push(...getInteractiveElements(el.shadowRoot));
+                            }
+                            node = walker.nextNode();
+                        }
+                        return elements;
+                    }
+
+                    const allInteractive = getInteractiveElements(document);
+                    const distilled = [];
+
+                    // 3. Extract & Optimize
+                    for (const el of allInteractive) {
+                        const rect = el.getBoundingClientRect();
+                        const centerX = Math.round(rect.x + rect.width / 2);
+                        const centerY = Math.round(rect.y + rect.height / 2);
+
+                        // Skip elements off-screen (optimization)
+                        if (centerY < 0 || centerY > window.innerHeight) continue;
+
+                        const item = {
+                            t: el.tagName.toLowerCase(), // tag
+                            c: [centerX, centerY] // center coordinates [x, y]
                         };
-                    })
-            );
 
-            // Extract buttons with enhanced attributes
-            const buttons = await this.page.$$eval('button, input[type="submit"], input[type="button"], [role="button"]', (elements) =>
-                elements
-                    .filter(el => {
-                        const style = window.getComputedStyle(el);
-                        return style.display !== 'none' && style.visibility !== 'hidden';
-                    })
-                    .slice(0, 15)
-                    .map(el => {
-                        const dataAttrs: Record<string, string> = {};
-                        Array.from(el.attributes)
-                            .filter(attr => attr.name.startsWith('data-'))
-                            .forEach(attr => dataAttrs[attr.name] = attr.value);
+                        // Add useful attributes (if present)
+                        const text = el.textContent?.trim() || el.value;
+                        if (text && text.length < 50) item.txt = text; // limit text length
 
-                        return {
-                            tag: el.tagName.toLowerCase(),
-                            id: el.id || undefined,
-                            name: el.getAttribute('name') || undefined,
-                            text: el.textContent?.trim().slice(0, 50) || el.getAttribute('value') || undefined,
-                            ariaLabel: el.getAttribute('aria-label') || undefined,
-                            ...dataAttrs
-                        };
-                    })
-            );
+                        if (el.id) item.id = el.id;
 
-            // Extract clickable elements (links, divs with click handlers)
-            const clickables = await this.page.$$eval('a, [onclick], [role="link"]', (elements) =>
-                elements
-                    .filter(el => {
-                        const style = window.getComputedStyle(el);
-                        return style.display !== 'none' && style.visibility !== 'hidden';
-                    })
-                    .slice(0, 15)
-                    .map(el => {
-                        const dataAttrs: Record<string, string> = {};
-                        Array.from(el.attributes)
-                            .filter(attr => attr.name.startsWith('data-'))
-                            .forEach(attr => dataAttrs[attr.name] = attr.value);
+                        const testId = el.getAttribute('data-test') || el.getAttribute('data-testid');
+                        if (testId) item.dt = testId;
 
-                        return {
-                            tag: el.tagName.toLowerCase(),
-                            id: el.id || undefined,
-                            text: el.textContent?.trim().slice(0, 50) || undefined,
-                            href: el.getAttribute('href') || undefined,
-                            ariaLabel: el.getAttribute('aria-label') || undefined,
-                            ...dataAttrs
-                        };
-                    })
-            );
+                        const label = el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.getAttribute('name');
+                        if (label) item.l = label; // l = label/name/placeholder
 
-            const url = this.page.url();
-            const context = { inputs, buttons, clickables, url };
+                        distilled.push(item);
+                    }
 
-            return JSON.stringify(context, null, 2);
+                    // 4. Return Top 300 elements
+                    return JSON.stringify({
+                        items: distilled.slice(0, 300),
+                        meta: { count: distilled.length, w: window.innerWidth, h: window.innerHeight }
+                    });
+                })()
+            `);
         } catch (e) {
-            console.error('Failed to extract page context:', e);
+            console.error('Failed to distill DOM:', e);
             return '{}';
         }
     }

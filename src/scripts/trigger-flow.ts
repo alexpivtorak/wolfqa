@@ -14,6 +14,20 @@ const connection = {
 
 const testQueue = new Queue('test-queue', { connection });
 
+// TODO: Refactor to use API
+// For now, we still push to queue directly, BUT we need the Server to be running to receive events if we want SSE.
+// CAUTION: The 'eventBus' is in-memory. If Worker and Server are separate processes (they are), 
+// the Server won't receive 'eventBus.emit' from the Worker.
+//
+// WE NEED REDIS PUB/SUB for inter-process communication.
+//
+// Refactoring plan:
+// 1. Worker publishes events to Redis 'wolfqa-events' channel.
+// 2. Server subscribes to Redis 'wolfqa-events' channel.
+// 3. Server forwards events to SSE clients.
+
+
+
 async function main() {
     const flowId = process.argv[2];
     const mode = process.argv[3] || 'standard';

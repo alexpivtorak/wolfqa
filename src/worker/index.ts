@@ -10,8 +10,12 @@ import dotenv from 'dotenv';
 import { Action, TestFlow } from '../agent/types.js';
 import fs from 'fs';
 import path from 'path';
+import Redis from 'ioredis';
 
 dotenv.config();
+
+// Redis Publisher for events
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 const connection = {
     url: process.env.REDIS_URL || 'redis://localhost:6379'
@@ -26,6 +30,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
     console.log(`Processing job ${job.id}: ${testName} [${mode || 'standard'}] on ${url}`);
 
     await db.update(testRuns).set({ status: 'running' }).where(eq(testRuns.id, testRunId));
+
+    // Emit Start Event
+    redis.publish('wolfqa-events', JSON.stringify({
+        runId: testRunId,
+        type: 'log',
+        message: `🚀 Starting job: ${testName}`,
+        timestamp: new Date()
+    }));
 
     const browser = new BrowserController();
     const brain = new VisionBrain();
@@ -77,6 +89,13 @@ const worker = new Worker('test-queue', async (job: Job) => {
             console.log(`--- Executing Step ${i + 1}/${steps.length}: ${currentStep.name} ---`);
             history.push(`\n--- STEP ${i + 1}: ${currentStep.name} (${currentStep.goal}) ---`);
 
+            redis.publish('wolfqa-events', JSON.stringify({
+                runId: testRunId,
+                type: 'log',
+                message: `📍 Step ${i + 1}: ${currentStep.name}`,
+                timestamp: new Date()
+            }));
+
             // Reset observer for new step
             observer.resetForNewStep();
 
@@ -104,6 +123,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
                     }
                     console.log(`✅ Cached execution successful for step "${currentStep.name}"`);
                     history.push(`[CACHE] Successfully executed ${cachedActions.length} actions.`);
+
+                    redis.publish('wolfqa-events', JSON.stringify({
+                        runId: testRunId,
+                        type: 'log',
+                        message: `⚡ FAST FORWARD: Executed ${cachedActions.length} cached actions.`,
+                        timestamp: new Date()
+                    }));
+
                     stepSuccess = true;
                     continue; // Skip to next step
                 } catch (e) {
@@ -134,11 +161,19 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 if (mode === 'chaos') {
                     action = await brain.decideChaosAction(screenshot, history);
                 } else {
-                    action = await brain.decideAction(screenshot, currentStep.goal, history, pageContext);
+                    action = await brain.decideAction(screenshot, currentStep.goal, history, pageContext, undefined, testRunId);
                 }
 
                 stepActions.push(action); // Record action (including done/fail)
-                history.push(`Action=${action.type} Reason=${action.reason || ''}`);
+
+                // Enhanced History Logging for Level 3 Intelligence
+                let details = '';
+                if (action.coordinate) details += ` Coord=(${action.coordinate.x},${action.coordinate.y})`;
+                if (action.selector) details += ` Sel="${action.selector}"`;
+                if (action.text) details += ` Text="${action.text}"`;
+                if (action.key) details += ` Key="${action.key}"`;
+
+                history.push(`Action=${action.type}${details} Reason=${action.reason || ''}`);
 
                 if (action.type === 'done') {
                     // Cache successful actions (excluding the 'done' action itself if preferred, but keeping it is fine)
@@ -237,6 +272,13 @@ const worker = new Worker('test-queue', async (job: Job) => {
             videoUrl: finalVideoPath || undefined
         }).where(eq(testRuns.id, testRunId));
 
+        redis.publish('wolfqa-events', JSON.stringify({
+            runId: testRunId,
+            type: 'log',
+            message: `✅ Job Completed Successfully`,
+            timestamp: new Date()
+        }));
+
     } catch (error: any) {
         console.error(`Job failed: ${error}`);
         const tempVideoPath = await browser.closeSession();
@@ -257,6 +299,13 @@ const worker = new Worker('test-queue', async (job: Job) => {
             logs: JSON.stringify([...history, `ERROR: ${error.message}`]),
             videoUrl: finalVideoPath || undefined
         }).where(eq(testRuns.id, testRunId));
+
+        redis.publish('wolfqa-events', JSON.stringify({
+            runId: testRunId,
+            type: 'log',
+            message: `❌ Job Failed: ${error.message}`,
+            timestamp: new Date()
+        }));
 
         await db.insert(issues).values({
             testRunId: testRunId,

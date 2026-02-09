@@ -8,6 +8,13 @@
       "when": 1770499532728,
       "tag": "0000_solid_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1770672356039,
+      "tag": "0001_panoramic_darkstar",
+      "breakpoints": true
     }
   ]
 }
