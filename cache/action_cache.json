@@ -44,7 +44,7 @@
       }
     ],
     "timestamp": 1770595131032,
-    "hitCount": 3
+    "hitCount": 15
   },
   "785bff968bd296e112988c9bccbdff40": {
     "actions": [
@@ -60,7 +60,7 @@
       }
     ],
     "timestamp": 1770595134820,
-    "hitCount": 3
+    "hitCount": 15
   },
   "7eb718b0ed519e22839dc64a3262abfc": {
     "actions": [
@@ -75,7 +75,7 @@
       }
     ],
     "timestamp": 1770595141096,
-    "hitCount": 3
+    "hitCount": 15
   },
   "2fbea4e1c72852aadace005b8576f638": {
     "actions": [
@@ -90,7 +90,7 @@
       }
     ],
     "timestamp": 1770595147366,
-    "hitCount": 3
+    "hitCount": 15
   },
   "061f9f6bf48a1318de94bd8df7f59414": {
     "actions": [
@@ -134,7 +134,7 @@
       }
     ],
     "timestamp": 1770595165996,
-    "hitCount": 3
+    "hitCount": 15
   },
   "93bf9a58d4df91bd87deceeb78d9f8e0": {
     "actions": [
@@ -199,7 +199,7 @@
       }
     ],
     "timestamp": 1770667290494,
-    "hitCount": 11
+    "hitCount": 13
   },
   "28b3413831bfe95b7f06e80c2f6d7a6e": {
     "actions": [
@@ -281,7 +281,7 @@
       }
     ],
     "timestamp": 1770667476600,
-    "hitCount": 8
+    "hitCount": 9
   },
   "9f91ae5aaa4571f790a6784c89e77c6b": {
     "actions": [
@@ -310,7 +310,7 @@
       }
     ],
     "timestamp": 1770667535119,
-    "hitCount": 8
+    "hitCount": 9
   },
   "2fb9d90985b102cc4e73abece46be37f": {
     "actions": [
@@ -325,6 +325,446 @@
       }
     ],
     "timestamp": 1770667569591,
+    "hitCount": 0
+  },
+  "11cf5f362e3c505589e355ebf48e37dc": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results",
+        "coordinate": {
+          "x": 640,
+          "y": 460
+        },
+        "intent": "San Marzano 62 Anniversario Primitivo di Manduria Riserva"
+      },
+      {
+        "type": "done",
+        "reason": "Successfully clicked on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results",
+        "coordinate": {
+          "x": 640,
+          "y": 460
+        }
+      }
+    ],
+    "timestamp": 1770674104251,
+    "hitCount": 0
+  },
+  "e62549ed91a4b195ff2361d9dc003a1b": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click on learn more link",
+        "coordinate": {
+          "x": 296,
+          "y": 204
+        },
+        "selector": "a"
+      },
+      {
+        "type": "click",
+        "reason": "Click on IANA-managed Reserved Domains link",
+        "coordinate": {
+          "x": 252,
+          "y": 471
+        }
+      },
+      {
+        "type": "done",
+        "reason": "Reached the intended page about IANA-managed Reserved Domains.",
+        "intent": "Verification Run"
+      }
+    ],
+    "timestamp": 1770679425336,
+    "hitCount": 0
+  },
+  "a264f1269fa12791b02cc4eb121073b4": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results",
+        "coordinate": {
+          "x": 640,
+          "y": 120
+        },
+        "selector": "[data-test='vintagePageLink']",
+        "intent": "San Marzano 62 Anniversario Primitivo di Manduria Riserva wine"
+      },
+      {
+        "type": "done",
+        "reason": "Successfully clicked on the San Marzano 62 Anniversario Primitivo di Manduria Riserva wine from the search results"
+      }
+    ],
+    "timestamp": 1770681387463,
+    "hitCount": 0
+  },
+  "ede664548e6f6f24ad9a651363df738d": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Adjust the quantity to 3. The current quantity is 6, so I need to click the '-' button three times.",
+        "selector": "[data-test='quantityPickerDecrease']",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      },
+      {
+        "type": "click",
+        "reason": "Adjust the quantity to 3. The current quantity is 5, so I need to click the '-' button twice.",
+        "selector": "[data-test='quantityPickerDecrease']",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      },
+      {
+        "type": "click",
+        "reason": "Adjust the quantity to 3. The current quantity is 4, so I need to click the '-' button once.",
+        "selector": "[data-test='quantityPickerDecrease']",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      },
+      {
+        "type": "done",
+        "reason": "The quantity is already set to 3.",
+        "selector": "[data-test='quantityPickerDecrease']",
+        "coordinate": {
+          "x": 893,
+          "y": 388
+        }
+      }
+    ],
+    "timestamp": 1770681403558,
+    "hitCount": 0
+  },
+  "86f7f815165369c18129208c7ff1c177": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Add these three bottles to the cart",
+        "coordinate": {
+          "x": 1044,
+          "y": 446
+        },
+        "selector": "[data-test='addToCart']"
+      },
+      {
+        "type": "done",
+        "reason": "The goal is achieved. The cart already contains three bottles of San Marzano 62 Anniversario Primitivo di Manduria Riserva 2019.",
+        "selector": "[data-test='cartMenu']"
+      }
+    ],
+    "timestamp": 1770681408379,
+    "hitCount": 0
+  },
+  "7adf7f54073664a59b991dc033754eb0": {
+    "actions": [
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "done",
+        "reason": "The goal is achieved. The cart is already open showing the previously added wine.",
+        "selector": "[data-test='cartMenu']"
+      }
+    ],
+    "timestamp": 1770681439418,
+    "hitCount": 0
+  },
+  "901dada4e04e42dd6550ac2b244527a7": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click the username input field to enter the username.",
+        "selector": "#user-name",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "intent": "username input"
+      },
+      {
+        "type": "type",
+        "reason": "Type the username into the username input field.",
+        "selector": "#user-name",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "text": "standard_user"
+      },
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "type",
+        "reason": "Type the password into the password input field.",
+        "selector": "#password",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        },
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the login button to submit the form.",
+        "coordinate": {
+          "x": 640,
+          "y": 327
+        },
+        "selector": "#login-button"
+      },
+      {
+        "type": "done",
+        "reason": "Successfully logged in."
+      }
+    ],
+    "timestamp": 1770681709165,
+    "hitCount": 0
+  },
+  "a3354952d1810ef5875a563f4823d8d6": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click the username input field to type in the username",
+        "selector": "#user-name",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "intent": "username input field"
+      },
+      {
+        "type": "type",
+        "reason": "Type username",
+        "selector": "#user-name",
+        "text": "standard_user"
+      },
+      {
+        "type": "click",
+        "reason": "Click the password input field to type in the password",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        },
+        "selector": "#password"
+      },
+      {
+        "type": "type",
+        "reason": "Type password",
+        "selector": "#password",
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the login button to proceed to the inventory page",
+        "selector": "#login-button",
+        "coordinate": {
+          "x": 640,
+          "y": 327
+        }
+      },
+      {
+        "type": "done",
+        "reason": "Successfully logged in and reached the inventory page. Test complete."
+      }
+    ],
+    "timestamp": 1770681993648,
+    "hitCount": 0
+  },
+  "516a065a8c5ca0007ccebd5f2ec20275": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click the username input field to type the username",
+        "selector": "[data-test='username']",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "intent": "username input"
+      },
+      {
+        "type": "type",
+        "reason": "Type the username 'standard_user' into the username input field",
+        "selector": "[data-test='username']",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "text": "standard_user"
+      },
+      {
+        "type": "wait",
+        "duration": 5000,
+        "reason": "Brain freeze (rate limited)"
+      },
+      {
+        "type": "click",
+        "reason": "Click the password input field to type the password",
+        "selector": "[data-test='password']",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        }
+      },
+      {
+        "type": "type",
+        "reason": "Type the password 'secret_sauce' into the password input field",
+        "selector": "[data-test='password']",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        },
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the Login button to submit the form",
+        "selector": "[data-test='login-button']",
+        "coordinate": {
+          "x": 640,
+          "y": 327
+        }
+      },
+      {
+        "type": "done",
+        "reason": "Successfully logged in and landed on the inventory page."
+      }
+    ],
+    "timestamp": 1770682069226,
+    "hitCount": 0
+  },
+  "2bdedfa53f7347f16b3263bd51e25c21": {
+    "actions": [
+      {
+        "type": "type",
+        "reason": "Type username into username field",
+        "selector": "#user-name",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "text": "standard_user"
+      },
+      {
+        "type": "type",
+        "reason": "Type password into password field",
+        "selector": "#password",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        },
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the login button after entering username and password.",
+        "selector": "#login-button",
+        "coordinate": {
+          "x": 640,
+          "y": 327
+        },
+        "intent": "login"
+      },
+      {
+        "type": "done",
+        "reason": "Login successful. We are on the inventory page.",
+        "selector": "#inventory_container"
+      }
+    ],
+    "timestamp": 1770682091008,
+    "hitCount": 8
+  },
+  "5c578c34845372e46d4204384f142ee2": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click on the username input field to enter the username.",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "selector": "#user-name"
+      },
+      {
+        "type": "type",
+        "reason": "Type the username into the username input field.",
+        "selector": "#user-name",
+        "coordinate": {
+          "x": 640,
+          "y": 174
+        },
+        "text": "standard_user"
+      },
+      {
+        "type": "click",
+        "reason": "Click on the password input field to enter the password.",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        },
+        "selector": "#password",
+        "intent": "password input"
+      },
+      {
+        "type": "type",
+        "reason": "Type the password into the password input field.",
+        "selector": "#password",
+        "coordinate": {
+          "x": 640,
+          "y": 228
+        },
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the login button to submit the form.",
+        "selector": "#login-button",
+        "coordinate": {
+          "x": 640,
+          "y": 327
+        }
+      },
+      {
+        "type": "done",
+        "reason": "Successfully logged in."
+      }
+    ],
+    "timestamp": 1770682191044,
+    "hitCount": 0
+  },
+  "61ed846c895203e0cb4d498b289d357b": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Navigate to a page that might have timestamp information",
+        "coordinate": {
+          "x": 296,
+          "y": 204
+        },
+        "selector": "a",
+        "intent": "Learn more"
+      },
+      {
+        "type": "done",
+        "reason": "The page contains the timestamp 'Last revised 2017-05-13.'",
+        "selector": null,
+        "coordinate": null,
+        "text": null,
+        "key": null,
+        "intent": null
+      }
+    ],
+    "timestamp": 1770682325507,
     "hitCount": 0
   }
 }

@@ -20,3 +20,11 @@ export interface TestFlow {
     name: string;
     steps: TestStep[];
 }
+
+export interface ChaosProfile {
+    name: 'standard' | 'gremlin' | 'hacker';
+    latency?: { min: number; max: number; chance: number };
+    packetLoss?: number; // 0.0 to 1.0
+    injection?: boolean; // SQLi, XSS
+    rageClick?: boolean; // Rapid clicking
+}

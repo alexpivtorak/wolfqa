@@ -38,13 +38,22 @@ export class ActionCache {
         }
     }
 
+
     /**
      * Generates a unique key for the step based on URL, step name, and goal.
+     * Uses fuzzy matching for URL (ignores query params).
      */
     private generateKey(url: string, stepName: string, goal: string): string {
-        // Normalize URL to remove query params if they are dynamic (optional, keeping it simple for now)
-        // For now, we use a hash of the combined inputs to ensure uniqueness and manageable keys
-        const data = `${url}|${stepName}|${goal}`;
+        // Normalize URL: remove query params to allow cache hits across sessions with different tokens/IDs
+        let normalizedUrl = url;
+        try {
+            const u = new URL(url);
+            normalizedUrl = `${u.protocol}//${u.host}${u.pathname}`; // Ignore search and hash
+        } catch (e) {
+            // value wasn't a valid URL, keep as is
+        }
+
+        const data = `${normalizedUrl}|${stepName}|${goal}`;
         return crypto.createHash('md5').update(data).digest('hex');
     }
 
@@ -56,12 +65,18 @@ export class ActionCache {
         const cached = this.cache[key];
 
         if (cached) {
-            console.log(`[ActionCache] Hit for ${stepName} (${key})`);
+            console.log(`[ActionCache] ⚡ HIT for ${stepName} (${key})`);
+
+            // Validate cache age (optional: expire after 24h?)
+            // const age = Date.now() - cached.timestamp;
+            // if (age > 86400000) return null;
+
             cached.hitCount++;
             this.save(); // Persist hit count update
             return cached.actions;
         }
 
+        console.log(`[ActionCache] 💨 MISS for ${stepName} (${key})`);
         return null;
     }
 
@@ -71,8 +86,8 @@ export class ActionCache {
     public set(url: string, stepName: string, goal: string, actions: Action[]): void {
         const key = this.generateKey(url, stepName, goal);
 
-        // Filter out non-reproducible actions if necessary (e.g., waiting for specific timestamps)
-        // For now, store all actions.
+        // Filter out actions that rely on specific coordinates unless they have a selector fallback?
+        // For now, we trust the brain's output or assume the brain will improve over time.
 
         this.cache[key] = {
             actions,
@@ -80,7 +95,7 @@ export class ActionCache {
             hitCount: 0
         };
 
-        console.log(`[ActionCache] Saved ${actions.length} actions for ${stepName} (${key})`);
+        console.log(`[ActionCache] 💾 SAVED ${actions.length} actions for ${stepName} (${key})`);
         this.save();
     }
 

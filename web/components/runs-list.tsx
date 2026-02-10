@@ -1,0 +1,90 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Run, getRuns } from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { PlayCircle, Clock, CheckCircle, XCircle } from 'lucide-react';
+
+export function RunsList() {
+    const [runs, setRuns] = useState<Run[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        getRuns().then(setRuns).finally(() => setLoading(false));
+
+        // Connect to Global Stream for real-time updates
+        const eventSource = new EventSource('http://localhost:3001/api/stream/global');
+
+        eventSource.addEventListener('run-created', (e: any) => {
+            try {
+                const newRun = JSON.parse(e.data);
+                console.log('New Run Recieved:', newRun);
+                setRuns(prev => [newRun, ...prev]);
+            } catch (err) {
+                console.error("Failed to parse run-created event", err);
+            }
+        });
+
+        eventSource.addEventListener('status-update', (e: any) => {
+            try {
+                const data = JSON.parse(e.data);
+                setRuns(prev => prev.map(run =>
+                    run.id === data.runId ? { ...run, status: data.status, result: data.result } : run
+                ));
+            } catch (err) {
+                console.error("Failed to parse status-update event", err);
+            }
+        });
+
+        return () => {
+            eventSource.close();
+        };
+    }, []);
+
+    if (loading) return <div className="text-center p-10">Loading missions...</div>;
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {runs.map((run) => (
+                <Link href={`/run/${run.id}`} key={run.id} className="block transition-transform hover:scale-105">
+                    <Card className="h-full border-l-4 border-l-primary/50 hover:border-l-primary">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium truncate" title={run.goal}>
+                                {run.goal}
+                            </CardTitle>
+                            {getStatusBadge(run.status, run.result)}
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                                <Clock className="w-3 h-3" />
+                                {new Date(run.createdAt).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate" title={run.url}>
+                                🔗 {run.url}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
+            ))}
+            {runs.length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground p-10">
+                    No missions found. Start one!
+                </div>
+            )}
+        </div>
+    );
+}
+
+function getStatusBadge(status: string, result: string | null) {
+    if (status === 'running') return <Badge variant="default" className="bg-blue-500 animate-pulse">Running</Badge>;
+    if (status === 'queued') return <Badge variant="secondary">Queued</Badge>;
+    if (status === 'completed') {
+        return result === 'pass'
+            ? <Badge variant="default" className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Pass</Badge>
+            : <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" /> Fail</Badge>;
+    }
+    return <Badge variant="outline">{status}</Badge>;
+}

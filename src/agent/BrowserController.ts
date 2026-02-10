@@ -69,9 +69,9 @@ export class BrowserController {
         await this.chaos.attach(this.page);
     }
 
-    async enableChaos() {
+    async enableChaos(profile?: any) {
         if (!this.page) return;
-        await this.chaos.injectGremlins();
+        await this.chaos.injectGremlins(profile);
     }
 
     async navigate(url: string) {

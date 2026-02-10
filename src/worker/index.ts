@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import { Action, TestFlow } from '../agent/types.js';
 import fs from 'fs';
 import path from 'path';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 dotenv.config();
 
@@ -23,7 +23,7 @@ const connection = {
 
 const worker = new Worker('test-queue', async (job: Job) => {
     // Support both single goal and multi-step flow
-    const { url, goal, flow, testRunId, mode } = job.data;
+    const { url, goal, flow, testRunId, mode, chaosProfile } = job.data;
     // flow: TestFlow | undefined
 
     const testName = flow ? flow.name : goal;
@@ -31,7 +31,15 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
     await db.update(testRuns).set({ status: 'running' }).where(eq(testRuns.id, testRunId));
 
-    // Emit Start Event
+    // Emit Status Event
+    redis.publish('wolfqa-events', JSON.stringify({
+        runId: testRunId,
+        type: 'status',
+        status: 'running',
+        timestamp: new Date()
+    }));
+
+    // Emit Start Log Event
     redis.publish('wolfqa-events', JSON.stringify({
         runId: testRunId,
         type: 'log',
@@ -75,8 +83,8 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
         if (mode === 'chaos') {
             console.log('🔥 enabling CHAOS MODE');
-            await browser.enableChaos();
-            history.push('🔥 CHAOS MODE ENABLED: Gremlins active (Latency + Packet Loss)');
+            await browser.enableChaos(chaosProfile);
+            history.push(`🔥 CHAOS MODE ENABLED: ${chaosProfile?.name || 'Standard Gremlin'}`);
         }
 
         // Normalize to a list of steps
@@ -111,6 +119,15 @@ const worker = new Worker('test-queue', async (job: Job) => {
             if (mode !== 'chaos' && cachedActions && cachedActions.length > 0) {
                 console.log(`⚡ Attempting ${cachedActions.length} cached actions for step "${currentStep.name}"`);
                 try {
+                    // Take a screenshot per step or every few actions to keep the live feed alive
+                    const screenshot = await browser.getScreenshot();
+                    redis.publish('wolfqa-events', JSON.stringify({
+                        runId: testRunId,
+                        type: 'frame',
+                        data: screenshot.toString('base64'),
+                        timestamp: new Date()
+                    }));
+
                     for (const action of cachedActions) {
                         if (action.type === 'done') continue; // Don't execute 'done', just finish loop
 
@@ -155,11 +172,21 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 const screenshotPath = path.join(screenshotDir, `${testRunId}_step${i + 1}_action${stepLoopCount}.jpg`);
                 fs.writeFileSync(screenshotPath, screenshot);
 
+                // FIREHOSE: Emit screenshot as a frame for live viewing
+                // We use a separate channel or event type to distinguishing from logs
+                redis.publish('wolfqa-events', JSON.stringify({
+                    runId: testRunId,
+                    type: 'frame',
+                    data: screenshot.toString('base64'),
+                    timestamp: new Date()
+                }));
+
+
                 const pageContext = await browser.getPageContext();
 
                 let action: Action;
                 if (mode === 'chaos') {
-                    action = await brain.decideChaosAction(screenshot, history);
+                    action = await brain.decideChaosAction(screenshot, history, chaosProfile);
                 } else {
                     action = await brain.decideAction(screenshot, currentStep.goal, history, pageContext, undefined, testRunId);
                 }
@@ -255,14 +282,21 @@ const worker = new Worker('test-queue', async (job: Job) => {
         let finalVideoPath: string | undefined;
 
         if (tempVideoPath && fs.existsSync(tempVideoPath)) {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const newFilename = `${timestamp}_${testRunId}.webm`;
-            const videoDir = path.dirname(tempVideoPath);
-            finalVideoPath = path.join(videoDir, newFilename);
+            // Predictable filename for frontend retrieval: run-{id}.webm determines the URL
+            const newFilename = `run-${testRunId}.webm`;
+            const videoDir = path.dirname(tempVideoPath); // .chat/videos or artifacts/videos
+            // We want to move it to a public artifacts folder if possible, but for now specific local
+            // Ensure artifacts/videos exists
+            const artifactsDir = path.resolve('./artifacts/videos');
+            if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
 
-            // Rename file
+            finalVideoPath = path.join(artifactsDir, newFilename);
+
+            // Rename/Move file
             fs.renameSync(tempVideoPath, finalVideoPath);
-            console.log(`Video saved to ${finalVideoPath}`);
+            console.log(`🎥 Video saved to ${finalVideoPath}`);
+            // Store relative path or just filename if serving from static root
+            finalVideoPath = `/videos/${newFilename}`;
         }
 
         await db.update(testRuns).set({
@@ -271,6 +305,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
             logs: JSON.stringify(history),
             videoUrl: finalVideoPath || undefined
         }).where(eq(testRuns.id, testRunId));
+
+        redis.publish('wolfqa-events', JSON.stringify({
+            runId: testRunId,
+            type: 'status',
+            status: 'completed',
+            result: 'pass',
+            timestamp: new Date()
+        }));
 
         redis.publish('wolfqa-events', JSON.stringify({
             runId: testRunId,
@@ -285,12 +327,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
         let finalVideoPath: string | undefined;
 
         if (tempVideoPath && fs.existsSync(tempVideoPath)) {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const newFilename = `${timestamp}_${testRunId}.webm`;
-            const videoDir = path.dirname(tempVideoPath);
-            finalVideoPath = path.join(videoDir, newFilename);
+            const newFilename = `run-${testRunId}.webm`;
+            const artifactsDir = path.resolve('./artifacts/videos');
+            if (!fs.existsSync(artifactsDir)) fs.mkdirSync(artifactsDir, { recursive: true });
+
+            finalVideoPath = path.join(artifactsDir, newFilename);
             fs.renameSync(tempVideoPath, finalVideoPath);
-            console.log(`Video saved to ${finalVideoPath}`);
+            console.log(`🎥 Fail Video saved to ${finalVideoPath}`);
+            finalVideoPath = `/videos/${newFilename}`;
         }
 
         await db.update(testRuns).set({
@@ -299,6 +343,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
             logs: JSON.stringify([...history, `ERROR: ${error.message}`]),
             videoUrl: finalVideoPath || undefined
         }).where(eq(testRuns.id, testRunId));
+
+        redis.publish('wolfqa-events', JSON.stringify({
+            runId: testRunId,
+            type: 'status',
+            status: 'failed',
+            result: 'fail',
+            timestamp: new Date()
+        }));
 
         redis.publish('wolfqa-events', JSON.stringify({
             runId: testRunId,

@@ -3,7 +3,7 @@ import { Action } from './types.js';
 import { testSteps } from '../db/schema.js';
 import { db } from '../db/index.js';
 import dotenv from 'dotenv';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 dotenv.config();
 
@@ -56,7 +56,7 @@ export class VisionBrain {
       ` : '';
 
         if (runId) {
-            redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'thought', message: 'Analyzing page state...' }));
+            redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'thought', message: 'Analyzing page state...', timestamp: new Date() }));
         }
 
         const prompt = `
@@ -82,6 +82,7 @@ ${contextSection}${diffSection}
       1. If the goal is achieved, return type: "done".
       2. If you are stuck or see an error, return type: "fail".
       3. For "click" actions: PREFER "coordinate" based on what you SEE in the screenshot.
+          - IF you can identify a reliable CSS selector (id, data-test) for the element at those coordinates, INCLUDE IT in the "selector" field. This helps with caching.
       4. For "type" actions: Type into input fields. After typing in a search box, use "keypress" with "key": "Enter" to submit.
       5. For "keypress": Use this after typing to submit forms (Enter), close dialogs (Escape), or move to next field (Tab).
       6. Do not wrap result in markdown blocks. Just raw JSON.
@@ -98,7 +99,7 @@ ${contextSection}${diffSection}
         return this.generateAction(prompt, screenshot);
     }
 
-    async decideChaosAction(screenshot: Buffer, history: string[]): Promise<Action> {
+    async decideChaosAction(screenshot: Buffer, history: string[], profile?: any): Promise<Action> {
         const prompt = `
       You are an Expert QA Penetration Tester. Your goal is NOT to complete the purchase successfully. Your goal is to crash the application, trigger error messages, or find logic loopholes.
 
@@ -131,20 +132,23 @@ ${contextSection}${diffSection}
 
         // --- NASTY STRING INJECTION ---
         // Overwrite text with nasty strings 50% of the time, or if the model specifically requested a placeholder
-        const NASTY_STRINGS = [
-            "' OR 1=1--",                // SQL Injection
-            "<script>alert(1)</script>", // XSS
-            "😀😃😄😁😆😅😂🤣",           // Emojis
-            "A".repeat(1000),            // Buffer Overflow / Long Text
-            "-1",                        // Negative Numbers
-            "0",                         // Zero
-            "undefined",                 // JS primitives
-            "null",
-            "{{7*7}}",                   // SSTI
-            "../../etc/passwd"           // Path Traversal
-        ];
+        // RESPECT PROFILE: Only inject if profile.injection is true (or undefined/standard)
+        const shouldParams = profile?.injection ?? true;
 
-        if (action.type === 'type') {
+        if (shouldParams && action.type === 'type') {
+            const NASTY_STRINGS = [
+                "' OR 1=1--",                // SQL Injection
+                "<script>alert(1)</script>", // XSS
+                "😀😃😄😁😆😅😂🤣",           // Emojis
+                "A".repeat(1000),            // Buffer Overflow / Long Text
+                "-1",                        // Negative Numbers
+                "0",                         // Zero
+                "undefined",                 // JS primitives
+                "null",
+                "{{7*7}}",                   // SSTI
+                "../../etc/passwd"           // Path Traversal
+            ];
+
             const shouldInject = Math.random() < 0.5 || action.text?.includes("NASTY") || !action.text;
             if (shouldInject) {
                 const randomString = NASTY_STRINGS[Math.floor(Math.random() * NASTY_STRINGS.length)];

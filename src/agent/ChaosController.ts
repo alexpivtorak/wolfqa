@@ -17,12 +17,12 @@ export class ChaosController {
     }
 
     /**
-     * Injects network gremlins (latency, packet loss)
+     * Injects network gremlins based on the active profile
      */
-    async injectGremlins() {
+    async injectGremlins(profile?: any) {
         if (!this.page) return;
 
-        console.log('👾 Injecting Network Gremlins...');
+        console.log(`👾 Injecting Network Gremlins [Profile: ${profile?.name || 'standard'}]...`);
 
         await this.page.route('**/*', async (route) => {
             if (!this.isActive) {
@@ -41,8 +41,14 @@ export class ChaosController {
                 return;
             }
 
-            // 10% chance to abort XHR/Fetch requests (Simulate packet loss)
-            if (random < 0.10 && (resourceType === 'xhr' || resourceType === 'fetch')) {
+            // Defaults if no profile provided (legacy support)
+            const packetLossChance = profile?.packetLoss ?? 0.10;
+            const latencyChance = profile?.latency?.chance ?? 0.20;
+            const latencyMin = profile?.latency?.min ?? 1000;
+            const latencyMax = profile?.latency?.max ?? 3000;
+
+            // Packet Loss (Simulate connection drop)
+            if (random < packetLossChance && (resourceType === 'xhr' || resourceType === 'fetch')) {
                 console.log(`👾 Gremlin intercepted: Aborting ${request.url().slice(0, 50)}...`);
                 try {
                     await route.abort('failed');
@@ -50,10 +56,9 @@ export class ChaosController {
                 return;
             }
 
-            // 20% chance to add massive latency (Simulate bad connections)
-            if (random > 0.10 && random < 0.30) {
-                // 1-3 seconds lag
-                const delay = Math.floor(Math.random() * 2000) + 1000;
+            // Latency (Simulate bad connections)
+            if (random > packetLossChance && random < (packetLossChance + latencyChance)) {
+                const delay = Math.floor(Math.random() * (latencyMax - latencyMin)) + latencyMin;
                 // console.log(`🐌 Gremlin slowing down: ${request.url().slice(0, 30)}... by ${delay}ms`);
                 await new Promise(r => setTimeout(r, delay));
             }

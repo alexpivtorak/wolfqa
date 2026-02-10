@@ -19,7 +19,8 @@
     "db:generate": "drizzle-kit generate:pg",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "kill:all": "cmd /c \"taskkill /F /IM node.exe /T || exit 0\""
   },
   "keywords": [
     "ai",

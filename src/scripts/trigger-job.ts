@@ -2,6 +2,7 @@ import { Queue } from 'bullmq';
 import { db } from '../db/index.js';
 import { testRuns, users } from '../db/schema.js';
 import dotenv from 'dotenv';
+import { Redis } from 'ioredis';
 
 dotenv.config();
 
@@ -48,6 +49,15 @@ async function main() {
         testRunId: testRun.id,
         mode
     });
+
+    // Notify Dashboard via Redis
+    const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    await redis.publish('wolfqa-events', JSON.stringify({
+        type: 'run-created',
+        run: testRun,
+        timestamp: new Date()
+    }));
+    redis.disconnect();
 
     console.log(`Job queued! TestRun ID: ${testRun.id}`);
     process.exit(0);

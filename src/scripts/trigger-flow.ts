@@ -5,6 +5,7 @@ import { TestFlow } from '../agent/types.js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { Redis } from 'ioredis';
 
 dotenv.config();
 
@@ -73,6 +74,15 @@ async function main() {
         testRunId: testRun.id,
         mode: mode
     });
+
+    // Notify Dashboard via Redis
+    const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    await redis.publish('wolfqa-events', JSON.stringify({
+        type: 'run-created',
+        run: testRun,
+        timestamp: new Date()
+    }));
+    redis.disconnect();
 
     console.log(`Flow queued! TestRun ID: ${testRun.id}`);
     process.exit(0);
