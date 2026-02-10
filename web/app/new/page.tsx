@@ -13,7 +13,17 @@ import { useRouter } from "next/navigation";
 export default function NewMission() {
     const router = useRouter();
     const [url, setUrl] = useState("https://saucedemo.com");
-    const [goal, setGoal] = useState("Login with standard_user and buy a onesie");
+    const [goal, setGoal] = useState(`Login securely.
+Add first item to the cart
+Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
+Click that Remove button so it's removed
+Go Back to Products
+Add second item to the cart
+Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
+Go to cart
+Verify that the second item is in the cart only.
+Data Entry: Fill out the multi-field checkout form.
+Verification: Click Finish and confirm the success message appears.`);
     const [isChaos, setIsChaos] = useState(false);
     const [chaosProfile, setChaosProfile] = useState<ChaosProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);

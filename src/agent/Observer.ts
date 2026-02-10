@@ -9,7 +9,7 @@ interface StateSnapshot {
 
 export class Observer {
     private snapshots: StateSnapshot[] = [];
-    private maxSnapshots = 10; // Keep last 10 states
+    private maxSnapshots = 25; // Keep last 25 states
 
     recordState(url: string, action?: Action) {
         this.snapshots.push({
@@ -43,21 +43,21 @@ export class Observer {
 
         const isFillingForm = recentTypes >= 3 && current.url === previous.url;
 
-        // Check 1: URL hasn't changed in 5+ actions (but allow form filling)
+        // Check 1: URL hasn't changed in 15+ actions (but allow form filling)
         if (current.url === previous.url &&
             previous.url === twoBefore.url &&
-            this.snapshots.length >= 7 &&
+            this.snapshots.length >= 15 &&
             !isFillingForm) {
-            return "STUCK: URL hasn't changed in 7 actions. Possible infinite loop.";
+            return "STUCK: URL hasn't changed in 15 actions. Possible infinite loop.";
         }
 
         // Check 2: Too many clicks without navigation (but allow form filling)
-        const recentClicks = this.snapshots.slice(-10).filter(
+        const recentClicks = this.snapshots.slice(-15).filter(
             s => s.lastAction?.type === 'click'
         ).length;
 
-        // Allow up to 8 clicks in a row (for quantity pickers, carousels)
-        if (recentClicks >= 8 && current.url === previous.url && !isFillingForm) {
+        // Allow up to 12 clicks in a row (for quantity pickers, carousels)
+        if (recentClicks >= 12 && current.url === previous.url && !isFillingForm) {
             return "LOOP: Multiple clicks without navigation. Consider typing or waiting.";
         }
 

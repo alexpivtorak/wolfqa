@@ -27,6 +27,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
     // flow: TestFlow | undefined
 
     const testName = flow ? flow.name : goal;
+    const history: string[] = [];
     console.log(`Processing job ${job.id}: ${testName} [${mode || 'standard'}] on ${url}`);
 
     await db.update(testRuns).set({ status: 'running' }).where(eq(testRuns.id, testRunId));
@@ -39,19 +40,19 @@ const worker = new Worker('test-queue', async (job: Job) => {
         timestamp: new Date()
     }));
 
-    // Emit Start Log Event
+    const startMsg = `🚀 Starting job: ${testName}`;
     redis.publish('wolfqa-events', JSON.stringify({
         runId: testRunId,
         type: 'log',
-        message: `🚀 Starting job: ${testName}`,
+        message: startMsg,
         timestamp: new Date()
     }));
+    history.push(startMsg);
 
     const browser = new BrowserController();
     const brain = new VisionBrain();
     const observer = new Observer();
     const actionCache = new ActionCache();
-    const history: string[] = [];
 
     try {
         await browser.launch();
@@ -97,12 +98,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
             console.log(`--- Executing Step ${i + 1}/${steps.length}: ${currentStep.name} ---`);
             history.push(`\n--- STEP ${i + 1}: ${currentStep.name} (${currentStep.goal}) ---`);
 
+            const stepMsg = `📍 Step ${i + 1}: ${currentStep.name}`;
             redis.publish('wolfqa-events', JSON.stringify({
                 runId: testRunId,
                 type: 'log',
-                message: `📍 Step ${i + 1}: ${currentStep.name}`,
+                message: stepMsg,
                 timestamp: new Date()
             }));
+            history.push(stepMsg);
 
             // Reset observer for new step
             observer.resetForNewStep();
@@ -141,12 +144,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
                     console.log(`✅ Cached execution successful for step "${currentStep.name}"`);
                     history.push(`[CACHE] Successfully executed ${cachedActions.length} actions.`);
 
+                    const cacheMsg = `⚡ FAST FORWARD: Executed ${cachedActions.length} cached actions.`;
                     redis.publish('wolfqa-events', JSON.stringify({
                         runId: testRunId,
                         type: 'log',
-                        message: `⚡ FAST FORWARD: Executed ${cachedActions.length} cached actions.`,
+                        message: cacheMsg,
                         timestamp: new Date()
                     }));
+                    history.push(cacheMsg);
 
                     stepSuccess = true;
                     continue; // Skip to next step

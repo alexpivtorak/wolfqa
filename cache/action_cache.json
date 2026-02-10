@@ -44,7 +44,7 @@
       }
     ],
     "timestamp": 1770595131032,
-    "hitCount": 15
+    "hitCount": 16
   },
   "785bff968bd296e112988c9bccbdff40": {
     "actions": [
@@ -60,7 +60,7 @@
       }
     ],
     "timestamp": 1770595134820,
-    "hitCount": 15
+    "hitCount": 16
   },
   "7eb718b0ed519e22839dc64a3262abfc": {
     "actions": [
@@ -75,7 +75,7 @@
       }
     ],
     "timestamp": 1770595141096,
-    "hitCount": 15
+    "hitCount": 16
   },
   "2fbea4e1c72852aadace005b8576f638": {
     "actions": [
@@ -90,7 +90,7 @@
       }
     ],
     "timestamp": 1770595147366,
-    "hitCount": 15
+    "hitCount": 16
   },
   "061f9f6bf48a1318de94bd8df7f59414": {
     "actions": [
@@ -134,7 +134,7 @@
       }
     ],
     "timestamp": 1770595165996,
-    "hitCount": 15
+    "hitCount": 16
   },
   "93bf9a58d4df91bd87deceeb78d9f8e0": {
     "actions": [
@@ -199,7 +199,7 @@
       }
     ],
     "timestamp": 1770667290494,
-    "hitCount": 13
+    "hitCount": 14
   },
   "28b3413831bfe95b7f06e80c2f6d7a6e": {
     "actions": [
@@ -396,7 +396,7 @@
       }
     ],
     "timestamp": 1770681387463,
-    "hitCount": 0
+    "hitCount": 1
   },
   "ede664548e6f6f24ad9a651363df738d": {
     "actions": [
@@ -682,7 +682,7 @@
       }
     ],
     "timestamp": 1770682091008,
-    "hitCount": 8
+    "hitCount": 9
   },
   "5c578c34845372e46d4204384f142ee2": {
     "actions": [
@@ -765,6 +765,47 @@
       }
     ],
     "timestamp": 1770682325507,
+    "hitCount": 0
+  },
+  "62420a49ffa1b4bad56aecad63d291be": {
+    "actions": [
+      {
+        "type": "click",
+        "reason": "Click the search box to enter the search term",
+        "coordinate": {
+          "x": 702,
+          "y": 30
+        },
+        "selector": "input[l='Search stories by title, url or author']",
+        "intent": "search input field"
+      },
+      {
+        "type": "type",
+        "reason": "Type 'AI' in the search box",
+        "selector": "input[l='Search stories by title, url or author']",
+        "coordinate": {
+          "x": 702,
+          "y": 30
+        },
+        "text": "AI"
+      },
+      {
+        "type": "keypress",
+        "reason": "Press Enter to perform the search",
+        "key": "Enter"
+      },
+      {
+        "type": "keypress",
+        "reason": "Press Enter to perform the search",
+        "key": "Enter"
+      },
+      {
+        "type": "done",
+        "reason": "Typed 'AI' in the search box and pressed Enter",
+        "selector": "input[l='Search stories by title, url or author']"
+      }
+    ],
+    "timestamp": 1770683549035,
     "hitCount": 0
   }
 }

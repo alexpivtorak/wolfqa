@@ -26,6 +26,22 @@ export default function RunPage() {
         getRun(id).then(data => {
             setRun(data);
             setSteps(data.steps || []);
+
+            // Load existing logs if available
+            if (data.logs) {
+                try {
+                    const parsed = typeof data.logs === 'string' ? JSON.parse(data.logs) : data.logs;
+                    if (Array.isArray(parsed)) {
+                        setLogs(parsed.map((m: string) => ({
+                            message: m,
+                            timestamp: data.createdAt, // approximation
+                            type: m.includes('Action:') ? 'thought' : 'log'
+                        })));
+                    }
+                } catch (e) {
+                    console.error('Failed to parse logs:', e);
+                }
+            }
         }).catch(err => console.error(err));
     }, [id]);
 
@@ -35,7 +51,9 @@ export default function RunPage() {
 
         eventSource.onopen = () => {
             setStatus('connected');
-            setLogs(prev => [...prev, { message: 'Connected to live stream...', timestamp: new Date().toISOString(), type: 'log' }]);
+            if (run?.status === 'running' || run?.status === 'queued') {
+                setLogs(prev => [...prev, { message: 'Connected to live stream...', timestamp: new Date().toISOString(), type: 'log' }]);
+            }
         };
 
         eventSource.addEventListener('log', (e: any) => {

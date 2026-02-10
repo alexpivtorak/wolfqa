@@ -1,7 +1,7 @@
 [
     {
         "id": "sauce-flow",
-        "name": "SauceDemo Purchase Flow",
+        "name": "SauceDemo Full E2E Flow",
         "url": "https://www.saucedemo.com",
         "steps": [
             {
@@ -9,20 +9,24 @@
                 "goal": "Login with user 'standard_user' and password 'secret_sauce'"
             },
             {
-                "name": "Scroll to the bottom of the page",
-                "goal": "Scroll to the bottom of the page and verify that footer is visible"
+                "name": "Sort",
+                "goal": "Sort the products by 'Price (high to low)' using the dropdown"
             },
             {
-                "name": "Add to Cart",
-                "goal": "Add the 'Sauce Labs Backpack' to the cart"
+                "name": "Add Items",
+                "goal": "Add the first two most expensive items to the cart"
             },
             {
-                "name": "Go to Cart",
-                "goal": "Click the shopping cart icon to view cart"
+                "name": "Remove Item",
+                "goal": "Go to the cart and remove the 'Sauce Labs Onesie' (or the cheaper item) from the list"
             },
             {
-                "name": "Checkout",
-                "goal": "Click Checkout"
+                "name": "Checkout Info",
+                "goal": "Click Checkout and fill the form (First: 'John', Last: 'Doe', Zip: '12345'), then click Continue"
+            },
+            {
+                "name": "Finalize",
+                "goal": "Click Finish and verify the 'Thank you for your order!' message appeared"
             }
         ]
     },
@@ -134,6 +138,74 @@
             {
                 "name": "Verify Cart",
                 "goal": "Verify that 'San Marzano 62 Anniversario' wine appears in the cart with quantity 3"
+            }
+        ]
+    },
+    {
+        "id": "hackernews-search",
+        "name": "Hacker News - Search & Filter",
+        "url": "https://hn.algolia.com/",
+        "steps": [
+            {
+                "name": "Search for 'AI'",
+                "goal": "Type 'AI' in the search box and press Enter"
+            },
+            {
+                "name": "Filter by 'Past 24h'",
+                "goal": "Change the time filter to 'Past 24h'"
+            },
+            {
+                "name": "Verify Content",
+                "goal": "Verify that search results related to AI are visible"
+            }
+        ]
+    },
+    {
+        "id": "the-internet-dynamic",
+        "name": "The Internet - Dynamic Loading",
+        "url": "https://the-internet.herokuapp.com/dynamic_loading/1",
+        "steps": [
+            {
+                "name": "Start Loading",
+                "goal": "Click the 'Start' button"
+            },
+            {
+                "name": "Wait for Finish",
+                "goal": "Wait for the loading bar to disappear and 'Hello World!' to appear"
+            }
+        ]
+    },
+    {
+        "id": "github-search",
+        "name": "GitHub Repository Discovery",
+        "url": "https://github.com",
+        "steps": [
+            {
+                "name": "Search Repo",
+                "goal": "Click search and type 'microsoft/playwright', then press Enter"
+            },
+            {
+                "name": "Select Result",
+                "goal": "Click on the main 'microsoft/playwright' repository link"
+            },
+            {
+                "name": "Check stars",
+                "goal": "Verify that the star count is visible on the page"
+            }
+        ]
+    },
+    {
+        "id": "duckduckgo-search",
+        "name": "DuckDuckGo Privacy Search",
+        "url": "https://duckduckgo.com",
+        "steps": [
+            {
+                "name": "Private Search",
+                "goal": "Search for 'Why is privacy important?'"
+            },
+            {
+                "name": "Verify Result",
+                "goal": "Ensure that DuckDuckGo's 'Bang' or privacy shield information is visible"
             }
         ]
     }

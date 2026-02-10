@@ -7,6 +7,7 @@ export interface Run {
     result: 'pass' | 'fail' | null;
     videoUrl?: string; // e.g. /videos/run-123.webm
     createdAt: string;
+    logs?: string;
 }
 
 export interface Step {
