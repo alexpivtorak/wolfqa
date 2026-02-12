@@ -1,39 +1,37 @@
 import Link from 'next/link';
+import { Github } from 'lucide-react';
 
 export function Footer() {
     return (
         <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex flex-col items-center justify-between gap-4 py-10 md:h-24 md:flex-row md:py-0">
-                <div className="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
-                    <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-                        Built by{" "}
-                        <a
-                            href="https://github.com/micro"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium underline underline-offset-4"
+            <div className="flex flex-col items-center justify-between gap-4 py-6 md:h-16 md:flex-row md:py-0 px-16">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="text-base">🐺</span>
+                    <span>Built by{" "}
+                        <Link
+                            href="/"
+                            className="font-medium text-foreground/80 transition-colors hover:text-foreground"
                         >
                             WolfQA Team
-                        </a>
-                        . The source code is available on{" "}
-                        <a
-                            href="https://github.com/micro/wolfqa"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium underline underline-offset-4"
-                        >
-                            GitHub
-                        </a>
-                        .
-                    </p>
+                        </Link>
+                    </span>
                 </div>
-                <div className="flex items-center gap-4">
-                    <Link href="/roadmap" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+
+                <div className="flex items-center gap-5">
+                    <Link href="/roadmap" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                         Roadmap
                     </Link>
-                    <Link href="/docs" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                    <Link href="/docs" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                         Documentation
                     </Link>
+                    <a
+                        href="https://github.com/alexpivtorak/wolfqa"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        <Github className="w-4 h-4" />
+                    </a>
                 </div>
             </div>
         </footer>

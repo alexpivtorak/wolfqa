@@ -5,7 +5,7 @@ import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { db } from '../db/index.js';
 import { testRuns, testSteps } from '../db/schema.js';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, lt } from 'drizzle-orm';
 import { EventEmitter } from 'events';
 import { Redis } from 'ioredis';
 import { Queue } from 'bullmq';
@@ -62,8 +62,18 @@ app.get('/', (c) => {
 // List recent runs
 app.get('/api/runs', async (c) => {
     const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 10;
-    const runs = await db.select().from(testRuns).orderBy(desc(testRuns.createdAt)).limit(limit);
-    return c.json(runs);
+    const cursor = c.req.query('cursor') ? parseInt(c.req.query('cursor')!) : undefined;
+
+    const query = db.select().from(testRuns).orderBy(desc(testRuns.id));
+
+    if (cursor) {
+        query.where(lt(testRuns.id, cursor));
+    }
+
+    const runs = await query.limit(limit);
+    const nextCursor = runs.length === limit ? runs[runs.length - 1].id : null;
+
+    return c.json({ runs, nextCursor });
 });
 
 // Get run details

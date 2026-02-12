@@ -135,7 +135,17 @@ const worker = new Worker('test-queue', async (job: Job) => {
                         if (action.type === 'done') continue; // Don't execute 'done', just finish loop
 
                         // Execute blindly (fast)
-                        console.log(`⚡ Executing cached: ${action.type} ${action.selector || action.text || ''}`);
+                        const cachedActionMsg = `⚡ Executing cached: ${action.type} ${action.selector || action.text || ''}`;
+                        console.log(cachedActionMsg);
+
+                        history.push(cachedActionMsg);
+                        redis.publish('wolfqa-events', JSON.stringify({
+                            runId: testRunId,
+                            type: 'log',
+                            message: cachedActionMsg,
+                            timestamp: new Date()
+                        }));
+
                         await browser.executeAction(action);
 
                         // Small wait to ensure stability

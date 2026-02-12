@@ -24,8 +24,12 @@ export interface Step {
 
 const API_BASE = 'http://localhost:3001/api';
 
-export async function getRuns(limit = 10): Promise<Run[]> {
-    const res = await fetch(`${API_BASE}/runs?limit=${limit}`);
+export async function getRuns(limit = 10, cursor?: number): Promise<{ runs: Run[], nextCursor: number | null }> {
+    const url = new URL(`${API_BASE}/runs`);
+    url.searchParams.append('limit', limit.toString());
+    if (cursor) url.searchParams.append('cursor', cursor.toString());
+
+    const res = await fetch(url.toString());
     if (!res.ok) throw new Error('Failed to fetch runs');
     return res.json();
 }
