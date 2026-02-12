@@ -53,7 +53,13 @@ export function RunsList() {
                     <Card className="h-full border-l-4 border-l-primary/50 hover:border-l-primary">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium truncate" title={run.goal}>
-                                {run.goal}
+                                Mission #{run.id}: {(() => {
+                                    try {
+                                        return new URL(run.url).hostname.replace('www.', '');
+                                    } catch {
+                                        return run.url;
+                                    }
+                                })()}
                             </CardTitle>
                             {getStatusBadge(run.status, run.result)}
                         </CardHeader>

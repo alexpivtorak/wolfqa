@@ -23,12 +23,12 @@ const connection = {
 
 const worker = new Worker('test-queue', async (job: Job) => {
     // Support both single goal and multi-step flow
-    const { url, goal, flow, testRunId, mode, chaosProfile } = job.data;
+    const { url, goal, flow, testRunId, mode, chaosProfile, model } = job.data;
     // flow: TestFlow | undefined
 
     const testName = flow ? flow.name : goal;
     const history: string[] = [];
-    console.log(`Processing job ${job.id}: ${testName} [${mode || 'standard'}] on ${url}`);
+    console.log(`Processing job ${job.id}: ${testName} [${mode || 'standard'}] on ${url} using ${model || 'default'}`);
 
     await db.update(testRuns).set({ status: 'running' }).where(eq(testRuns.id, testRunId));
 
@@ -40,7 +40,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
         timestamp: new Date()
     }));
 
-    const startMsg = `🚀 Starting job: ${testName}`;
+    const startMsg = `🚀 Starting job: ${testName} (${model || 'gemini-2.0-flash'})`;
     redis.publish('wolfqa-events', JSON.stringify({
         runId: testRunId,
         type: 'log',
@@ -50,7 +50,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
     history.push(startMsg);
 
     const browser = new BrowserController();
-    const brain = new VisionBrain();
+    const brain = new VisionBrain(undefined, model); // Pass model here
     const observer = new Observer();
     const actionCache = new ActionCache();
 
@@ -167,6 +167,12 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
             // Sub-loop for the specific step
             while (stepLoopCount < MAX_STEPS_PER_GOAL) {
+                redis.publish('wolfqa-events', JSON.stringify({
+                    runId: testRunId,
+                    type: 'log',
+                    message: `📸 Capturing page state [Iteration ${stepLoopCount + 1}]...`,
+                    timestamp: new Date()
+                }));
                 const screenshot = await browser.getScreenshot();
 
                 // Save screenshot for debugging
@@ -189,6 +195,13 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
                 const pageContext = await browser.getPageContext();
 
+                redis.publish('wolfqa-events', JSON.stringify({
+                    runId: testRunId,
+                    type: 'log',
+                    message: `🧠 Thinking about next step...`,
+                    timestamp: new Date()
+                }));
+
                 let action: Action;
                 if (mode === 'chaos') {
                     action = await brain.decideChaosAction(screenshot, history, chaosProfile);
@@ -204,6 +217,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 if (action.selector) details += ` Sel="${action.selector}"`;
                 if (action.text) details += ` Text="${action.text}"`;
                 if (action.key) details += ` Key="${action.key}"`;
+
+                const actionLogMsg = `👉 Action: ${action.type}${details} (${action.reason || ''})`;
+                redis.publish('wolfqa-events', JSON.stringify({
+                    runId: testRunId,
+                    type: 'log',
+                    message: actionLogMsg,
+                    timestamp: new Date()
+                }));
 
                 history.push(`Action=${action.type}${details} Reason=${action.reason || ''}`);
 
@@ -256,6 +277,12 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
                 if (intervention) {
                     console.warn(`⚠️ Observer Intervention: ${intervention}`);
+                    redis.publish('wolfqa-events', JSON.stringify({
+                        runId: testRunId,
+                        type: 'log',
+                        message: `⚠️ Observer: ${intervention}`,
+                        timestamp: new Date()
+                    }));
                     history.push(`OBSERVER: ${intervention}`);
                     // Force fail to prevent infinite loops
                     throw new Error(`Observer detected issue: ${intervention}`);

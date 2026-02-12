@@ -8,22 +8,31 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ChaosControlPanel, ChaosProfile } from "@/components/chaos-control";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 
 export default function NewMission() {
     const router = useRouter();
     const [url, setUrl] = useState("https://saucedemo.com");
-    const [goal, setGoal] = useState(`Login securely.
-Add first item to the cart
-Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
-Click that Remove button so it's removed
-Go Back to Products
-Add second item to the cart
-Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
-Go to cart
-Verify that the second item is in the cart only.
-Data Entry: Fill out the multi-field checkout form.
-Verification: Click Finish and confirm the success message appears.`);
+    // Default model to Gemini 2.0 Flash
+    const [model, setModel] = useState("gemini-2.0-flash");
+    const [goal, setGoal] = useState(`1. Login securely with user "standard_user" and password "secret_sauce"
+2. Add first item to the cart
+3. Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
+4. Click that Remove button so the product is removed from cart
+5. Go Back to Products
+6. Add second item to the cart
+7. Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
+8. Go to cart
+9. Verify that the second item is in the cart only.
+10. Data Entry: Fill out the multi-field checkout form.
+11. Verification: Click Finish and confirm the success message appears.`);
     const [isChaos, setIsChaos] = useState(false);
     const [chaosProfile, setChaosProfile] = useState<ChaosProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +52,7 @@ Verification: Click Finish and confirm the success message appears.`);
                     goal,
                     mode: isChaos ? "chaos" : "standard",
                     chaosProfile: isChaos ? chaosProfile : undefined,
+                    model, // Pass selected model
                 }),
             });
 
@@ -70,15 +80,37 @@ Verification: Click Finish and confirm the success message appears.`);
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="url">Target URL</Label>
-                            <Input
-                                id="url"
-                                placeholder="https://example.com"
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                required
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="url">Target URL</Label>
+                                <Input
+                                    id="url"
+                                    placeholder="https://example.com"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="model">AI Model</Label>
+                                <Select value={model} onValueChange={setModel}>
+                                    <SelectTrigger id="model">
+                                        <SelectValue placeholder="Select Model" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="gemini-2.0-flash">
+                                            ⚡ Gemini 2.0 Flash (Recommended)
+                                        </SelectItem>
+                                        <SelectItem value="gemini-2.0-pro">
+                                            🧠 Gemini 2.0 Pro (High Reasoning)
+                                        </SelectItem>
+                                        <SelectItem value="gemini-2.5-flash-lite">
+                                            🏎️ Gemini 2.5 Flash Lite (Fastest)
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -89,7 +121,7 @@ Verification: Click Finish and confirm the success message appears.`);
                                 value={goal}
                                 onChange={(e) => setGoal(e.target.value)}
                                 required
-                                className="h-24"
+                                className="min-h-[300px]"
                             />
                         </div>
 

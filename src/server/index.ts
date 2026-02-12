@@ -80,24 +80,16 @@ app.get('/api/runs/:id', async (c) => {
 
 // Create a new run (Trigger Job)
 app.post('/api/jobs', async (c) => {
-    const { url, goal, mode, chaosProfile } = await c.req.json();
+    const { url, goal, mode, chaosProfile, model } = await c.req.json();
 
     if (!url || !goal) return c.json({ error: 'Missing url or goal' }, 400);
 
-    console.log(`Triggering Job: ${goal} on ${url} [${mode}]`);
+    console.log(`Triggering Job: ${goal} on ${url} [${mode}] using ${model || 'default'}`);
 
     // Ensure a default user exists (temporary hack until auth)
     let user = await db.query.users.findFirst();
     if (!user) {
-        /*
-        const [newUser] = await db.insert(users).values({
-            email: 'demo@wolfqa.com',
-            apiKey: 'demo-key'
-        }).returning();
-        user = newUser;
-         */
-        // If no user table, just ignore userId for now if schema allows, or fetch a placeholder
-        // Assuming testRuns has userId as nullable or we have a seed script
+        // ... (user creation logic commented out in original)
     }
 
     // Create Test Run record
@@ -105,7 +97,8 @@ app.post('/api/jobs', async (c) => {
         // userId: user?.id, 
         url: url,
         goal: goal,
-        status: 'queued'
+        status: 'queued',
+        model: model || 'gemini-2.0-flash' // Default if not provided
     }).returning();
 
     const queue = new Queue('test-queue', { connection: redis });
@@ -116,7 +109,8 @@ app.post('/api/jobs', async (c) => {
         goal,
         testRunId: testRun.id,
         mode,
-        chaosProfile
+        chaosProfile,
+        model: model || 'gemini-2.0-flash'
     });
 
     await queue.close();

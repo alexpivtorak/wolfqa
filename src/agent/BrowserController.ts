@@ -2,7 +2,11 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import { Action, ActionType } from './types.js';
+import { Redis } from 'ioredis';
 import { ChaosController } from './ChaosController.js';
+
+// Redis Publisher for events
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 // Interface for DOM state tracking
 interface DOMSnapshot {
@@ -146,23 +150,8 @@ export class BrowserController {
     async clickAtCoordinate(x: number, y: number): Promise<void> {
         if (!this.page) throw new Error('Session not started');
 
-        const viewport = this.page.viewportSize();
-        const viewportHeight = viewport?.height || 720;
-
-        // If y-coordinate is beyond viewport, scroll first
-        if (y > viewportHeight - 50) {
-            const scrollAmount = y - (viewportHeight / 2);
-            console.log(`📜 Scrolling ${scrollAmount}px to reach y=${y}`);
-            await this.page.evaluate((scroll) => window.scrollBy(0, scroll), scrollAmount);
-            await this.page.waitForTimeout(300);
-
-            // Recalculate y after scroll
-            const newY = y - scrollAmount;
-            console.log(`Clicking at adjusted coordinates (${x}, ${newY})`);
-            await this.page.mouse.click(x, newY);
-        } else {
-            await this.page.mouse.click(x, y);
-        }
+        console.log(`Clicking to coordinates (${x}, ${y})`);
+        await this.page.mouse.click(x, y);
     }
 
     /**
@@ -830,8 +819,18 @@ export class BrowserController {
                         }
                     } else {
                         // Scroll page - check if "bottom" intent
-                        const scrollAmount = action.reason?.toLowerCase().includes('bottom') ? 10000 : 500;
-                        await this.page.evaluate((amt) => window.scrollBy(0, amt), scrollAmount);
+                        const scrollAmount = action.reason?.toLowerCase().includes('bottom') ? 10000 : 300;
+
+                        // Safety check: Don't scroll if we're already at the bottom
+                        const canScroll = await this.page.evaluate(() => {
+                            return (window.innerHeight + window.scrollY) < document.body.scrollHeight;
+                        });
+
+                        if (canScroll) {
+                            await this.page.evaluate((amt) => window.scrollBy(0, amt), scrollAmount);
+                        } else {
+                            console.log('🚫 Cannot scroll further, reached bottom of page');
+                        }
                     }
                     await this.page.waitForTimeout(300);
                     break;

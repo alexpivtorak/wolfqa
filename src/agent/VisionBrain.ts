@@ -14,14 +14,15 @@ export class VisionBrain {
     private genAI: GoogleGenerativeAI;
     private model: any;
 
-    constructor(apiKey?: string) {
+    constructor(apiKey?: string, modelName?: string) {
         const key = apiKey || process.env.GOOGLE_API_KEY;
         if (!key) throw new Error('GOOGLE_API_KEY is required');
         this.genAI = new GoogleGenerativeAI(key);
-        // Using 2.0 Flash Lite as 1.5 Flash returned 404
-        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-        console.log(`🤖 VisionBrain initialized with model: ${modelName}`);
-        this.model = this.genAI.getGenerativeModel({ model: modelName });
+
+        // Prioritize passed model, then env var, then default to 2.0-flash
+        const selectedModel = modelName || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        console.log(`🤖 VisionBrain initialized with model: ${selectedModel}`);
+        this.model = this.genAI.getGenerativeModel({ model: selectedModel });
     }
 
     async decideAction(screenshot: Buffer, goal: string, history: string[], pageContext?: string, domDiff?: string, runId?: number): Promise<Action> {
@@ -66,34 +67,41 @@ export class VisionBrain {
       History of actions:
       ${history.join('\n')}
 ${contextSection}${diffSection}
-      Analyze the screenshot. Determine the next logical step to achieve the goal.
-      Return ONLY a JSON object with the following structure:
+      Analyze the screenshot and context. Determine the next logical step.
+
+      RETURN A JSON OBJECT WITH TWO PARTS: "thought" AND "action".
+      
+      1. THOUGHT PROCESS:
+      - Analyze the current state (Where am I? What do I see?)
+      - Evaluate previous action result (Did the page change? Did I fail?)
+      - Formulate a plan (What needs to happen next?)
+      - Select the best element (Prefer ID/Data-Test over Text over Coordinates)
+
+      2. ACTION:
       {
-        "type": "click" | "type" | "keypress" | "scroll" | "hover" | "wait" | "navigate" | "done" | "fail",
-        "reason": "short explanation",
-        "selector": "css selector (optional)",
-        "coordinate": { "x": 123, "y": 456 } (optional, for click/hover),
-        "text": "text to type" (optional, for 'type' action),
-        "key": "Enter" | "Escape" | "Tab" | etc. (optional, for 'keypress' action),
-        "intent": "what button/element you're looking for" (optional, for heuristic search)
+        "thought": "I see a login form. The previous action clicked the 'Sign In' link. Now I need to enter the username. I see an input with id='email'.",
+        "action": {
+            "type": "click" | "type" | "keypress" | "scroll" | "hover" | "wait" | "navigate" | "done" | "fail",
+            "reason": "short explanation for logs",
+            "selector": "css selector (PREFER THIS)",
+            "coordinate": { "x": 123, "y": 456 } (BACKUP if selector fails),
+            "text": "text to type" (for 'type' action),
+            "key": "Enter" | "Escape" | "Tab" (for 'keypress' action)
+        }
       }
 
-      Rules:
-      1. If the goal is achieved, return type: "done".
-      2. If you are stuck or see an error, return type: "fail".
-      3. For "click" actions: PREFER "coordinate" based on what you SEE in the screenshot.
-          - IF you can identify a reliable CSS selector (id, data-test) for the element at those coordinates, INCLUDE IT in the "selector" field. This helps with caching.
-      4. For "type" actions: Type into input fields. After typing in a search box, use "keypress" with "key": "Enter" to submit.
-      5. For "keypress": Use this after typing to submit forms (Enter), close dialogs (Escape), or move to next field (Tab).
-      6. Do not wrap result in markdown blocks. Just raw JSON.
-      7. IMPORTANT: If a button is hidden or covered by an overlay, use "keypress" with "Enter" instead of trying to click it.
+      SELECTOR PRIORITY RULES:
+      1. **ROBUST SELECTORS**: Always prefer 'id', 'data-test', 'data-testid', 'name' attributes.
+         - Example: "selector": "[data-test='submit-btn']"
+      2. **TEXT/ARIA**: If no robust ID, use text content or aria-label.
+         - Example: "selector": "button:has-text('Login')"
+      3. **COORDINATES**: Use coordinates ONLY as a fallback if the element has no good selector or is inside a Shadow DOM/Canvas.
 
-      CRITICAL ANTI-LOOP RULES:
-      8. **INTERACTION TRANSITION**: If you just clicked an input field (search, login), your NEXT action MUST be "type". Do not click it again.
-      9. **DO NOT CLEAR OR RETYPE**: If an input field ALREADY contains the correct text you need, DO NOT clear it or retype. Move to the NEXT action.
-      10. **PROGRESS FORWARD**: After typing, the next step is usually "keypress" with "Enter" or clicking a visible submit button.
-      11. **DETECT SUCCESS**: If the page has visually changed (new content, different URL), the goal is likely DONE.
-      12. **LOOP DETECTION**: If history shows you attempted the same action 2+ times, STOP. Either return "done" if goal seems achieved, or "fail" if truly stuck.
+      CRITICAL RULES:
+      1. **INPUT HANDLING**: To type into a field, just return type="type" with the selector. You DO NOT need to click it first. The system handles focus.
+      2. **ANTI-LOOP**: If you tried an action and the Page Change Detection says "No changes detected", DO NOT try the exact same action again. Try a different selector or coordinate.
+      3. **SUCCESS**: If the visual state matches the goal, return type="done".
+      4. **FAILURE**: If you are stuck after 3 attempts, return type="fail".
     `;
 
         return this.generateAction(prompt, screenshot);
@@ -186,21 +194,24 @@ ${contextSection}${diffSection}
                     throw new Error("No JSON found in response");
                 }
 
-                const action = JSON.parse(jsonMatch[0]) as Action;
+                const parsed = JSON.parse(jsonMatch[0]);
+
+                // Handle both old format (direct Action) and new format ({ thought, action })
+                const action = (parsed.action ? parsed.action : parsed) as Action;
+                const thought = parsed.thought || action.reason;
 
                 if (runId) {
-                    redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'step', action, timestamp: new Date() }));
+                    // Publish the specific "Chain of Thought" event
+                    if (parsed.thought) {
+                        redis.publish('wolfqa-events', JSON.stringify({
+                            runId,
+                            type: 'log',
+                            message: `💭 BIG BRAIN: ${parsed.thought}`, // Distinct prefix
+                            timestamp: new Date()
+                        }));
+                    }
 
-                    // Persist to DB immediately
-                    // await db.insert(testSteps).values({
-                    //    runId,
-                    //    stepNumber: history.length + 1, // approximate
-                    //    actionType: action.type,
-                    //    thought: action.reason,
-                    //    selector: action.selector,
-                    //    // screenshotUrl: ... (handled by worker)
-                    //    domSnapshot: {} // (handled by worker)
-                    // });
+                    redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'step', action, timestamp: new Date() }));
                 }
 
                 return action;

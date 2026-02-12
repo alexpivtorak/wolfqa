@@ -30,29 +30,33 @@ export class Observer {
      * Returns null if OK, or an intervention message if stuck
      */
     validateProgress(): string | null {
-        if (this.snapshots.length < 3) return null;
+        // Filter out 'wait' actions for progress validation
+        // 'wait' is often used during rate-limiting/429s and shouldn't count as a "stuck" action
+        const progressActions = this.snapshots.filter(s => s.lastAction?.type !== 'wait');
 
-        const current = this.snapshots[this.snapshots.length - 1];
-        const previous = this.snapshots[this.snapshots.length - 2];
-        const twoBefore = this.snapshots[this.snapshots.length - 3];
+        if (progressActions.length < 3) return null;
+
+        const current = progressActions[progressActions.length - 1];
+        const previous = progressActions[progressActions.length - 2];
+        const twoBefore = progressActions[progressActions.length - 3];
 
         // Check if we're filling a form (multiple 'type' actions on same page)
-        const recentTypes = this.snapshots.slice(-5).filter(
+        const recentTypes = progressActions.slice(-5).filter(
             s => s.lastAction?.type === 'type'
         ).length;
 
         const isFillingForm = recentTypes >= 3 && current.url === previous.url;
 
-        // Check 1: URL hasn't changed in 15+ actions (but allow form filling)
+        // Check 1: URL hasn't changed in 15+ ACTIVE actions (but allow form filling)
         if (current.url === previous.url &&
             previous.url === twoBefore.url &&
-            this.snapshots.length >= 15 &&
+            progressActions.length >= 15 &&
             !isFillingForm) {
             return "STUCK: URL hasn't changed in 15 actions. Possible infinite loop.";
         }
 
         // Check 2: Too many clicks without navigation (but allow form filling)
-        const recentClicks = this.snapshots.slice(-15).filter(
+        const recentClicks = progressActions.slice(-15).filter(
             s => s.lastAction?.type === 'click'
         ).length;
 
@@ -61,31 +65,48 @@ export class Observer {
             return "LOOP: Multiple clicks without navigation. Consider typing or waiting.";
         }
 
+        const currentAction = current.lastAction;
+        if (!currentAction) return null;
+
         // Check 3: Repeating the same action (exact same type) multiple times
         // Allow up to 5 repetitions for clicks (e.g. quantity adjusters, carousels)
-        if (current.lastAction?.type === previous.lastAction?.type &&
-            current.lastAction?.type === twoBefore.lastAction?.type &&
+        if (currentAction.type === previous.lastAction?.type &&
+            currentAction.type === twoBefore.lastAction?.type &&
             current.url === previous.url &&
-            current.lastAction?.type !== 'type') {
+            currentAction.type !== 'type') {
 
             // Calculate how many times in a row this action type happened
             let repeatCount = 0;
-            for (let i = this.snapshots.length - 1; i >= 0; i--) {
-                if (this.snapshots[i].lastAction?.type === current.lastAction?.type) {
+            const targets = new Set<string>();
+
+            for (let i = progressActions.length - 1; i >= 0; i--) {
+                const action = progressActions[i].lastAction;
+                if (action && action.type === currentAction.type) {
                     repeatCount++;
+                    // Track unique targets (selectors or coordinates)
+                    if (action.selector) targets.add(action.selector);
+                    if (action.coordinate) targets.add(`${action.coordinate.x},${action.coordinate.y}`);
                 } else {
                     break;
                 }
             }
 
-            // If it's a click loop > 5 times, intervene
-            if (current.lastAction?.type === 'click' && repeatCount >= 6) {
-                return `REPETITION: Click action repeated ${repeatCount} times without navigation.`;
-            }
+            // If it's a click loop, check if we are hitting the SAME target
+            if (currentAction.type === 'click') {
+                // If we are clicking different things (e.g. checkbox list, tabs), allow more
+                // If we are clicking the EXACT same target 5 times, it's a loop
+                const isSameTargetLoop = targets.size === 1 && repeatCount >= 5;
+                const isGeneralClickLoop = repeatCount >= 15; // Hard limit for any click sequence without navigation
 
-            // For other actions (like scroll), keep tight limit
-            if (current.lastAction?.type !== 'click' && repeatCount >= 3) {
-                return `REPETITION: Action (${current.lastAction?.type}) repeated 3+ times.`;
+                if (isSameTargetLoop) {
+                    return `REPETITION: Clicking the same target ${repeatCount} times without navigation or state change.`;
+                }
+                if (isGeneralClickLoop) {
+                    return `LIMIT: 15+ clicks without navigation. The agent might be lost.`;
+                }
+            } else if (repeatCount >= 5) {
+                // For other actions (like scroll), allow up to 5
+                return `REPETITION: Action (${currentAction.type}) repeated 5+ times.`;
             }
         }
 
