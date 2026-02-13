@@ -22,17 +22,28 @@ export default function NewMission() {
     const [url, setUrl] = useState("https://saucedemo.com");
     // Default model to Gemini 2.0 Flash
     const [model, setModel] = useState("gemini-2.0-flash");
-    const [goal, setGoal] = useState(`1. Login securely with user "standard_user" and password "secret_sauce"
-2. Add first item to the cart
-3. Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
-4. Click that Remove button so the product is removed from cart, once clicked verify that button on this page is changed to "Add to cart" (means it was removed from the cart) and go to the next step
-5. Go Back to Products
-6. Add second item to the cart
-7. Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
-8. Go to cart
-9. Verify that the second item is in the cart only.
-10. Data Entry: Fill out the multi-field checkout form.
-11. Verification: Click Finish and confirm the success message appears.`);
+    const [goal, setGoal] = useState(`GOAL: Complete the Checkout Flow.
+CRITICAL RULE: DO NOT EMIT 'DONE' UNTIL YOU SEE THE TEXT "THANK YOU FOR YOUR ORDER".
+IF YOU EMIT 'DONE' BEFORE THAT, YOU FAIL.
+
+PHASE 1: INVENTORY & CART
+1. Login with "standard_user" / "secret_sauce".
+2. Add "Sauce Labs Backpack".
+3. Add "Sauce Labs Bike Light".
+4. Click Shopping Cart Icon.
+5. Click "Checkout".
+
+PHASE 2: DATA ENTRY (MANDATORY)
+6. INSPECT "First Name" field. IF EMPTY -> TYPE "Wolf".
+7. INSPECT "Last Name" field. IF EMPTY -> TYPE "QA".
+8. INSPECT "Zip" field. IF EMPTY -> TYPE "90210".
+(Do not assume these are filled. Look at the pixels.)
+
+PHASE 3: FINISH
+9. Click "Continue".
+10. Click "Finish".
+11. VERIFY "Thank you for your order" is visible.
+12. ONLY NOW -> Emit "Done".`);
     const [isChaos, setIsChaos] = useState(false);
     const [chaosProfile, setChaosProfile] = useState<ChaosProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
