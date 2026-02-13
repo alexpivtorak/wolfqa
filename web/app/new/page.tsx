@@ -25,7 +25,7 @@ export default function NewMission() {
     const [goal, setGoal] = useState(`1. Login securely with user "standard_user" and password "secret_sauce"
 2. Add first item to the cart
 3. Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
-4. Click that Remove button so the product is removed from cart
+4. Click that Remove button so the product is removed from cart, once clicked verify that button on this page is changed to "Add to cart" (means it was removed from the cart) and go to the next step
 5. Go Back to Products
 6. Add second item to the cart
 7. Go to this item page, verify that button on this page is changed to "Remove" (means it was added to the cart)
@@ -36,6 +36,7 @@ export default function NewMission() {
     const [isChaos, setIsChaos] = useState(false);
     const [chaosProfile, setChaosProfile] = useState<ChaosProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [headless, setHeadless] = useState(true);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -52,7 +53,8 @@ export default function NewMission() {
                     goal,
                     mode: isChaos ? "chaos" : "standard",
                     chaosProfile: isChaos ? chaosProfile : undefined,
-                    model, // Pass selected model
+                    model,
+                    headless,
                 }),
             });
 
@@ -137,6 +139,22 @@ export default function NewMission() {
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
                                     The agent will face network lag, errors, and will fuzz inputs to try and break the app.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 border p-4 rounded-lg bg-muted/50">
+                            <Switch
+                                id="headless-mode"
+                                checked={headless}
+                                onCheckedChange={setHeadless}
+                            />
+                            <div className="flex-1">
+                                <Label htmlFor="headless-mode" className="font-bold">
+                                    Headless Mode 👻
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Run the browser without a visible window. Disable to watch the agent live on your machine.
                                 </p>
                             </div>
                         </div>

@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { BrowserController } from '../agent/BrowserController.js';
 import { VisionBrain } from '../agent/VisionBrain.js';
 import { Observer } from '../agent/Observer.js';
+import { HistoryManager } from '../agent/HistoryManager.js';
 import { ActionCache } from '../agent/ActionCache.js';
 import { db } from '../db/index.js';
 import { testRuns, issues } from '../db/schema.js';
@@ -23,11 +24,11 @@ const connection = {
 
 const worker = new Worker('test-queue', async (job: Job) => {
     // Support both single goal and multi-step flow
-    const { url, goal, flow, testRunId, mode, chaosProfile, model } = job.data;
+    const { url, goal, flow, testRunId, mode, chaosProfile, model, headless } = job.data;
     // flow: TestFlow | undefined
 
     const testName = flow ? flow.name : goal;
-    const history: string[] = [];
+    const history = new HistoryManager();
     console.log(`Processing job ${job.id}: ${testName} [${mode || 'standard'}] on ${url} using ${model || 'default'}`);
 
     await db.update(testRuns).set({ status: 'running' }).where(eq(testRuns.id, testRunId));
@@ -47,7 +48,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
         message: startMsg,
         timestamp: new Date()
     }));
-    history.push(startMsg);
+    history.log(startMsg);
 
     const browser = new BrowserController();
     const brain = new VisionBrain(undefined, model); // Pass model here
@@ -55,9 +56,12 @@ const worker = new Worker('test-queue', async (job: Job) => {
     const actionCache = new ActionCache();
 
     try {
-        await browser.launch();
+        await browser.launch(headless !== false);
         await browser.startSession(job.id || 'unknown');
         await browser.navigate(url);
+
+        // Initial snapshot for DOM Diffing
+        await browser.captureDOMSnapshot();
 
         // --- MONITORING & CHAOS SETUP ---
         const pageErrors: string[] = [];
@@ -70,14 +74,14 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 const msg = `[PAGE ERROR] ${err.message}`;
                 console.error(msg);
                 pageErrors.push(msg);
-                history.push(msg);
+                history.log(msg);
             });
             browser.page.on('response', resp => {
                 if (resp.status() >= 500) {
                     const msg = `[SERVER ERROR] ${resp.status()} on ${resp.url()}`;
                     console.error(msg);
                     failedRequests.push(msg);
-                    history.push(msg);
+                    history.log(msg);
                 }
             });
         }
@@ -85,7 +89,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
         if (mode === 'chaos') {
             console.log('🔥 enabling CHAOS MODE');
             await browser.enableChaos(chaosProfile);
-            history.push(`🔥 CHAOS MODE ENABLED: ${chaosProfile?.name || 'Standard Gremlin'}`);
+            history.log(`🔥 CHAOS MODE ENABLED: ${chaosProfile?.name || 'Standard Gremlin'}`);
         }
 
         // Normalize to a list of steps
@@ -96,7 +100,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
         for (let i = 0; i < steps.length; i++) {
             const currentStep = steps[i];
             console.log(`--- Executing Step ${i + 1}/${steps.length}: ${currentStep.name} ---`);
-            history.push(`\n--- STEP ${i + 1}: ${currentStep.name} (${currentStep.goal}) ---`);
+            history.log(`\n--- STEP ${i + 1}: ${currentStep.name} (${currentStep.goal}) ---`);
 
             const stepMsg = `📍 Step ${i + 1}: ${currentStep.name}`;
             redis.publish('wolfqa-events', JSON.stringify({
@@ -105,14 +109,20 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 message: stepMsg,
                 timestamp: new Date()
             }));
-            history.push(stepMsg);
+            history.log(stepMsg);
+
+            // Check if we should stop
+            const [run] = await db.select().from(testRuns).where(eq(testRuns.id, testRunId)).execute();
+            if (run?.status === 'stopping') {
+                throw new Error('Mission stopped by user');
+            }
 
             // Reset observer for new step
             observer.resetForNewStep();
 
             let stepSuccess = false;
             let stepLoopCount = 0;
-            const MAX_STEPS_PER_GOAL = mode === 'chaos' ? 50 : 15;
+            const MAX_STEPS_PER_GOAL = mode === 'chaos' ? 50 : 25;
 
             // --- CACHE CHECK ---
             const currentUrl = browser.page?.url() || url; // simple approximation
@@ -138,7 +148,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
                         const cachedActionMsg = `⚡ Executing cached: ${action.type} ${action.selector || action.text || ''}`;
                         console.log(cachedActionMsg);
 
-                        history.push(cachedActionMsg);
+                        history.log(cachedActionMsg);
                         redis.publish('wolfqa-events', JSON.stringify({
                             runId: testRunId,
                             type: 'log',
@@ -152,7 +162,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
                         await browser.page?.waitForTimeout(500);
                     }
                     console.log(`✅ Cached execution successful for step "${currentStep.name}"`);
-                    history.push(`[CACHE] Successfully executed ${cachedActions.length} actions.`);
+                    history.log(`[CACHE] Successfully executed ${cachedActions.length} actions.`);
 
                     const cacheMsg = `⚡ FAST FORWARD: Executed ${cachedActions.length} cached actions.`;
                     redis.publish('wolfqa-events', JSON.stringify({
@@ -161,13 +171,13 @@ const worker = new Worker('test-queue', async (job: Job) => {
                         message: cacheMsg,
                         timestamp: new Date()
                     }));
-                    history.push(cacheMsg);
+                    history.log(cacheMsg);
 
                     stepSuccess = true;
                     continue; // Skip to next step
                 } catch (e) {
                     console.warn(`❌ Cached execution failed: ${e}. Falling back to Vision.`);
-                    history.push(`[CACHE] Failed: ${e}. Recovering with Vision.`);
+                    history.log(`[CACHE] Failed: ${e}. Recovering with Vision.`);
                     // Fallthrough to standard Vision loop
                 }
             }
@@ -177,6 +187,12 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
             // Sub-loop for the specific step
             while (stepLoopCount < MAX_STEPS_PER_GOAL) {
+                // Check if we should stop
+                const [runStatus] = await db.select().from(testRuns).where(eq(testRuns.id, testRunId)).execute();
+                if (runStatus?.status === 'stopping') {
+                    throw new Error('Mission stopped by user');
+                }
+
                 redis.publish('wolfqa-events', JSON.stringify({
                     runId: testRunId,
                     type: 'log',
@@ -214,9 +230,18 @@ const worker = new Worker('test-queue', async (job: Job) => {
 
                 let action: Action;
                 if (mode === 'chaos') {
-                    action = await brain.decideChaosAction(screenshot, history, chaosProfile);
+                    action = await brain.decideChaosAction(screenshot, history.getFullLog(), chaosProfile);
                 } else {
-                    action = await brain.decideAction(screenshot, currentStep.goal, history, pageContext, undefined, testRunId);
+                    const promptHistory = history.getPromptHistory();
+
+                    // Add observer warnings to the prompt
+                    const earlyWarning = observer.getEarlyWarning();
+                    const optimizedHistory = earlyWarning ? `${promptHistory}\n\nATTENTION: ${earlyWarning}` : promptHistory;
+
+                    // Get current DOM diff feedback
+                    const domDiff = await browser.getDOMDiff();
+
+                    action = await brain.decideAction(screenshot, currentStep.goal, [optimizedHistory], pageContext, domDiff.summary, testRunId);
                 }
 
                 stepActions.push(action); // Record action (including done/fail)
@@ -235,8 +260,10 @@ const worker = new Worker('test-queue', async (job: Job) => {
                     message: actionLogMsg,
                     timestamp: new Date()
                 }));
-
-                history.push(`Action=${action.type}${details} Reason=${action.reason || ''}`);
+                // Record action and wait for execution results to get outcome for the next turn
+                // Outcome will be captured in the NEXT iteration via DOM Diff
+                // (Wait, we can't record the outcome BEFORE we execute it, so we'll record the Action now)
+                // history.record(action, "Executing...", i + 1); // HistoryManager doesn't have a placeholder state, so we just wait
 
                 if (action.type === 'done') {
                     // Cache successful actions (excluding the 'done' action itself if preferred, but keeping it is fine)
@@ -275,6 +302,10 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 const currentUrlObs = browser.page?.url() || '';
                 observer.recordState(currentUrlObs, action);
 
+                // Record in history with the diff outcome
+                const postActionDiff = await browser.getDOMDiff();
+                history.record(action, postActionDiff.summary, i + 1);
+
                 // Check for stuck states
                 const intervention = observer.validateProgress();
 
@@ -293,7 +324,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
                         message: `⚠️ Observer: ${intervention}`,
                         timestamp: new Date()
                     }));
-                    history.push(`OBSERVER: ${intervention}`);
+                    history.log(`OBSERVER: ${intervention}`);
                     // Force fail to prevent infinite loops
                     throw new Error(`Observer detected issue: ${intervention}`);
                 }
@@ -301,7 +332,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
                 // Periodically update DB logs
                 if (stepLoopCount % 3 === 0) {
                     await db.update(testRuns).set({
-                        logs: JSON.stringify(history)
+                        logs: JSON.stringify(history.getFullLog())
                     }).where(eq(testRuns.id, testRunId));
                 }
                 stepLoopCount++;
@@ -315,7 +346,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
             const stepValidation = observer.validateStepCompletion(currentStep.name);
             if (stepValidation) {
                 console.warn(`⚠️ Observer: ${stepValidation}`);
-                history.push(`OBSERVER: ${stepValidation}`);
+                history.log(`OBSERVER: ${stepValidation}`);
                 throw new Error(stepValidation);
             }
         }
@@ -344,7 +375,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
         await db.update(testRuns).set({
             status: 'completed',
             result: 'pass',
-            logs: JSON.stringify(history),
+            logs: JSON.stringify(history.getFullLog()),
             videoUrl: finalVideoPath || undefined
         }).where(eq(testRuns.id, testRunId));
 
@@ -353,6 +384,7 @@ const worker = new Worker('test-queue', async (job: Job) => {
             type: 'status',
             status: 'completed',
             result: 'pass',
+            videoUrl: finalVideoPath,
             timestamp: new Date()
         }));
 
@@ -379,33 +411,40 @@ const worker = new Worker('test-queue', async (job: Job) => {
             finalVideoPath = `/videos/${newFilename}`;
         }
 
+        const isStopped = error.message === 'Mission stopped by user';
+        const finalStatus = isStopped ? 'stopped' : 'failed';
+        const finalResult = isStopped ? null : 'fail';
+
         await db.update(testRuns).set({
-            status: 'failed',
-            result: 'fail',
-            logs: JSON.stringify([...history, `ERROR: ${error.message}`]),
+            status: finalStatus,
+            result: finalResult,
+            logs: JSON.stringify([...history.getFullLog(), isStopped ? '🛑 Mission stopped by user' : `❌ ERROR: ${error.message}`]),
             videoUrl: finalVideoPath || undefined
         }).where(eq(testRuns.id, testRunId));
 
         redis.publish('wolfqa-events', JSON.stringify({
             runId: testRunId,
             type: 'status',
-            status: 'failed',
-            result: 'fail',
+            status: finalStatus,
+            result: finalResult,
+            videoUrl: finalVideoPath,
             timestamp: new Date()
         }));
 
         redis.publish('wolfqa-events', JSON.stringify({
             runId: testRunId,
             type: 'log',
-            message: `❌ Job Failed: ${error.message}`,
+            message: isStopped ? '🛑 Mission stopped' : `❌ Job Failed: ${error.message}`,
             timestamp: new Date()
         }));
 
-        await db.insert(issues).values({
-            testRunId: testRunId,
-            description: error.message || 'Unknown error',
-            severity: 'high'
-        });
+        if (!isStopped) {
+            await db.insert(issues).values({
+                testRunId: testRunId,
+                description: error.message || 'Unknown error',
+                severity: 'high'
+            });
+        }
     } finally {
         await browser.cleanup();
     }

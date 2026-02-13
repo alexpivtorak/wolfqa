@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause, RotateCcw, Download } from "lucide-react";
 
 interface VideoPlayerProps {
     src: string;
@@ -85,10 +85,14 @@ export function VideoPlayer({ src, poster }: VideoPlayerProps) {
                         Replay
                     </Button>
                 </div>
-                <a href={src} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                    Download
-                </a>
+                <Button variant="outline" size="sm" asChild>
+                    <a href={src} download={`wolfqa-run.webm`} target="_blank" rel="noopener noreferrer">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                    </a>
+                </Button>
             </div>
         </div>
     );
 }
+

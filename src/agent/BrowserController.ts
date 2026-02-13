@@ -46,9 +46,9 @@ export class BrowserController {
         this.chaos = new ChaosController();
     }
 
-    async launch() {
+    async launch(headless: boolean = true) {
         this.browser = await chromium.launch({
-            headless: true, // Run headless in production/worker
+            headless,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
         });
     }
@@ -313,7 +313,9 @@ export class BrowserController {
                     if (type === 'password') {
                         formValues[key] = input.value ? '[FILLED]' : '[EMPTY]';
                     } else {
-                        formValues[key] = input.value ? '[HAS_VALUE]' : '[EMPTY]';
+                        // Capture first/last few chars to detect change without leaking everything
+                        const val = input.value || '';
+                        formValues[key] = val ? `[VAL:${val.length}:${val.slice(0, 3)}...${val.slice(-3)}]` : '[EMPTY]';
                     }
                 });
 
@@ -386,14 +388,27 @@ export class BrowserController {
         if (buttonCountChanged) changes.push(`Buttons: ${previous.buttonCount} → ${current.buttonCount}`);
         if (textChanged) changes.push('Page content changed');
 
+        // Check for input value changes
+        const changedInputs: string[] = [];
+        for (const [key, value] of Object.entries(current.formValues)) {
+            if (previous.formValues[key] !== value) {
+                changedInputs.push(key);
+            }
+        }
+        if (changedInputs.length > 0) {
+            changes.push(`Input values changed: ${changedInputs.join(', ')}`);
+        }
+
+        const actuallyHasChanges = hasChanges || changedInputs.length > 0;
+
         return {
             urlChanged,
             titleChanged,
             inputCountChanged,
             buttonCountChanged,
             textChanged,
-            hasChanges,
-            summary: hasChanges ? changes.join(', ') : 'No changes detected'
+            hasChanges: actuallyHasChanges,
+            summary: actuallyHasChanges ? changes.join(', ') : 'No changes detected'
         };
     }
 

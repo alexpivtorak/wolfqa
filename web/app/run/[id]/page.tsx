@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Run, Step, getRun, getStreamUrl } from '@/lib/api';
+import { Run, Step, getRun, getStreamUrl, stopRun } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ExternalLink, Terminal, Camera, Zap, Video } from 'lucide-react';
+import { ExternalLink, Terminal, Camera, Zap, Video, Square } from 'lucide-react';
 import { VideoPlayer } from '@/components/video-player';
-import { Timeline } from '@/components/timeline';
 
 import {
     Dialog,
@@ -35,7 +34,6 @@ export default function RunPage() {
     const params = useParams();
     const id = params.id as string;
     const [run, setRun] = useState<Run | null>(null);
-    const [steps, setSteps] = useState<Step[]>([]);
     const [logs, setLogs] = useState<{ message: string, timestamp: string, type: 'log' | 'thought' }[]>([]);
     const [status, setStatus] = useState('connecting');
     const [liveFrame, setLiveFrame] = useState<string | null>(null);
@@ -74,11 +72,27 @@ export default function RunPage() {
         }
     };
 
+    const [isStopping, setIsStopping] = useState(false);
+    const handleStop = async () => {
+        if (!run || !id) return;
+        if (!confirm("Are you sure you want to stop this mission?")) return;
+
+        setIsStopping(true);
+        try {
+            await stopRun(id);
+            // Status update will come via SSE
+        } catch (error) {
+            console.error(error);
+            alert("Failed to stop mission.");
+        } finally {
+            setIsStopping(false);
+        }
+    };
+
     // Initial Load
     useEffect(() => {
         getRun(id).then(data => {
             setRun(data);
-            setSteps(data.steps || []);
 
             // Load existing logs if available
             if (data.logs) {
@@ -124,14 +138,7 @@ export default function RunPage() {
             }
         });
 
-        es.addEventListener('step', (e) => {
-            try {
-                const data = JSON.parse(e.data);
-                setSteps(prev => [...prev, data]);
-            } catch (err) {
-                console.error('Failed to parse step event:', err);
-            }
-        });
+
 
         es.addEventListener('frame', (e) => {
             setLiveFrame(e.data);
@@ -141,7 +148,12 @@ export default function RunPage() {
             try {
                 const data = JSON.parse(e.data);
                 if (data.status) {
-                    setRun(prev => prev ? { ...prev, status: data.status, result: data.result ?? prev.result } : prev);
+                    setRun(prev => prev ? {
+                        ...prev,
+                        status: data.status,
+                        result: data.result ?? prev.result,
+                        videoUrl: data.videoUrl ?? prev.videoUrl
+                    } : prev);
                     setLogs(prev => [...prev, {
                         message: `Mission status changed to: ${data.status}${data.result ? ` (${data.result})` : ''}`,
                         timestamp: data.timestamp || new Date().toISOString(),
@@ -193,41 +205,56 @@ export default function RunPage() {
                     </div>
                 </div>
 
-                <Dialog open={isRerunOpen} onOpenChange={setIsRerunOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-2">
-                            <Zap className="w-4 h-4" /> Re-run Mission
+                <div className="flex gap-2 items-center">
+                    {(run.status === 'running' || run.status === 'stopping') && (
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            className="gap-2 bg-red-600 hover:bg-red-700"
+                            onClick={handleStop}
+                            disabled={isStopping || run.status === 'stopping'}
+                        >
+                            <Square className="w-4 h-4 fill-current" />
+                            {run.status === 'stopping' ? 'Stopping...' : 'STOP Mission'}
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Re-run Mission #{run.id}</DialogTitle>
-                            <DialogDescription>
-                                Start a new run with the same goal and URL, but you can change the model.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="space-y-2">
-                                <label htmlFor="model" className="text-sm font-medium">Select Model</label>
-                                <Select value={rerunModel} onValueChange={setRerunModel}>
-                                    <SelectTrigger id="model">
-                                        <SelectValue placeholder="Select Model" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="gemini-2.0-flash">⚡ Gemini 2.0 Flash (Recommended)</SelectItem>
-                                        <SelectItem value="gemini-2.0-pro">🧠 Gemini 2.0 Pro (High Reasoning)</SelectItem>
-                                        <SelectItem value="gemini-2.5-flash-lite">🏎️ Gemini 2.5 Flash Lite (Fastest)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleRerun} disabled={isRerunLoading}>
-                                {isRerunLoading ? "Starting..." : "🚀 Start Re-run"}
+                    )}
+
+                    <Dialog open={isRerunOpen} onOpenChange={setIsRerunOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <Zap className="w-4 h-4" /> Re-run Mission
                             </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Re-run Mission #{run.id}</DialogTitle>
+                                <DialogDescription>
+                                    Start a new run with the same goal and URL, but you can change the model.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="space-y-2">
+                                    <label htmlFor="model" className="text-sm font-medium">Select Model</label>
+                                    <Select value={rerunModel} onValueChange={setRerunModel}>
+                                        <SelectTrigger id="model">
+                                            <SelectValue placeholder="Select Model" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="gemini-2.0-flash">⚡ Gemini 2.0 Flash (Recommended)</SelectItem>
+                                            <SelectItem value="gemini-2.0-pro">🧠 Gemini 2.0 Pro (High Reasoning)</SelectItem>
+                                            <SelectItem value="gemini-2.5-flash-lite">🏎️ Gemini 2.5 Flash Lite (Fastest)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button onClick={handleRerun} disabled={isRerunLoading}>
+                                    {isRerunLoading ? "Starting..." : "🚀 Start Re-run"}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </header>
 
             {/* Rest of UI */}
@@ -235,14 +262,14 @@ export default function RunPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
                 {/* Left: Video / Timeline */}
                 <Card className="lg:col-span-2 flex flex-col h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-0">
                         <CardTitle className="flex items-center gap-2">
                             <Video className="w-5 h-5 text-purple-500" />
                             {run.status === 'running' ? 'Live Feed' : 'Mission Replay'}
                         </CardTitle>
                     </CardHeader>
 
-                    <CardContent className="flex-1 p-4 flex flex-col gap-4 overflow-hidden">
+                    <CardContent className="flex-1 px-4 pb-4 pt-0 flex flex-col gap-4 overflow-hidden">
                         {/* Video Player Area */}
                         <div className="flex-1 bg-black rounded-lg flex items-center justify-center overflow-hidden border shadow-inner relative">
                             {run.status === 'running' && liveFrame ? (
@@ -269,10 +296,7 @@ export default function RunPage() {
                             )}
                         </div>
 
-                        {/* Timeline */}
-                        <div className="h-[140px] shrink-0">
-                            <Timeline steps={steps} />
-                        </div>
+
                     </CardContent>
                 </Card>
 

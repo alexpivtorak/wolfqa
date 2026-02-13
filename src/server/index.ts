@@ -88,9 +88,37 @@ app.get('/api/runs/:id', async (c) => {
     return c.json({ ...run[0], steps });
 });
 
+// Stop a run
+app.post('/api/runs/:id/stop', async (c) => {
+    const id = parseInt(c.req.param('id'));
+    const [run] = await db.select().from(testRuns).where(eq(testRuns.id, id)).execute();
+
+    if (!run) return c.json({ error: 'Run not found' }, 404);
+    if (run.status !== 'running' && run.status !== 'queued') {
+        return c.json({ error: 'Run is not in a stoppable state' }, 400);
+    }
+
+    // Update status to 'stopping'
+    await db.update(testRuns)
+        .set({ status: 'stopping', updatedAt: new Date() })
+        .where(eq(testRuns.id, id))
+        .execute();
+
+    // Broadcast status change
+    eventBus.emit('status', {
+        runId: id,
+        status: 'stopping',
+        timestamp: new Date()
+    });
+
+    console.log(`🛑 Run ${id} marked as stopping`);
+
+    return c.json({ success: true });
+});
+
 // Create a new run (Trigger Job)
 app.post('/api/jobs', async (c) => {
-    const { url, goal, mode, chaosProfile, model } = await c.req.json();
+    const { url, goal, mode, chaosProfile, model, headless } = await c.req.json();
 
     if (!url || !goal) return c.json({ error: 'Missing url or goal' }, 400);
 
@@ -120,7 +148,8 @@ app.post('/api/jobs', async (c) => {
         testRunId: testRun.id,
         mode,
         chaosProfile,
-        model: model || 'gemini-2.0-flash'
+        model: model || 'gemini-2.0-flash',
+        headless: headless !== false // Default true
     });
 
     await queue.close();
@@ -146,7 +175,12 @@ app.get('/api/stream/global', async (c) => {
 
         const onStatus = async (data: any) => {
             await stream.writeSSE({
-                data: JSON.stringify({ runId: data.runId, status: data.status, result: data.result }),
+                data: JSON.stringify({
+                    runId: data.runId,
+                    status: data.status,
+                    result: data.result,
+                    videoUrl: data.videoUrl
+                }),
                 event: 'status-update',
             });
         };

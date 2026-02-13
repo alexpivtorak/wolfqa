@@ -94,8 +94,8 @@ export class Observer {
             // If it's a click loop, check if we are hitting the SAME target
             if (currentAction.type === 'click') {
                 // If we are clicking different things (e.g. checkbox list, tabs), allow more
-                // If we are clicking the EXACT same target 5 times, it's a loop
-                const isSameTargetLoop = targets.size === 1 && repeatCount >= 5;
+                // If we are clicking the EXACT same target 3 times, it's a loop
+                const isSameTargetLoop = targets.size === 1 && repeatCount >= 3;
                 const isGeneralClickLoop = repeatCount >= 15; // Hard limit for any click sequence without navigation
 
                 if (isSameTargetLoop) {
@@ -107,6 +107,31 @@ export class Observer {
             } else if (repeatCount >= 5) {
                 // For other actions (like scroll), allow up to 5
                 return `REPETITION: Action (${currentAction.type}) repeated 5+ times.`;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns a soft warning if repetition is starting
+     */
+    getEarlyWarning(): string | null {
+        if (this.snapshots.length < 2) return null;
+
+        const last = this.snapshots[this.snapshots.length - 1];
+        const prev = this.snapshots[this.snapshots.length - 2];
+
+        if (last.lastAction?.type === 'click' &&
+            prev.lastAction?.type === 'click' &&
+            last.url === prev.url) {
+
+            // Check if same selector/coordinate
+            const lastTarget = last.lastAction.selector || JSON.stringify(last.lastAction.coordinate);
+            const prevTarget = prev.lastAction.selector || JSON.stringify(prev.lastAction.coordinate);
+
+            if (lastTarget === prevTarget) {
+                return `⚠️ Warning: You clicked the same target twice and the page didn't change. Try a different approach or verify the element state.`;
             }
         }
 

@@ -1,0 +1,53 @@
+{
+  "b229dae2f4d5ebfd68a427322e7b338d": {
+    "actions": [
+      {
+        "type": "type",
+        "reason": "Enter username into the username field.",
+        "selector": "[data-test='username']",
+        "text": "standard_user"
+      },
+      {
+        "type": "type",
+        "reason": "Enter the password 'secret_sauce' into the password field.",
+        "selector": "[data-test='password']",
+        "text": "secret_sauce"
+      },
+      {
+        "type": "click",
+        "reason": "Click the login button to submit the credentials.",
+        "selector": "[data-test='login-button']",
+        "coordinate": {
+          "x": 640,
+          "y": 327
+        }
+      },
+      {
+        "type": "click",
+        "reason": "Click the 'Add to cart' button for Sauce Labs Backpack.",
+        "selector": "[data-test='add-to-cart-sauce-labs-backpack']"
+      },
+      {
+        "type": "click",
+        "reason": "Remove Sauce Labs Backpack from cart as per goal.",
+        "selector": "[data-test='remove-sauce-labs-backpack']"
+      },
+      {
+        "type": "click",
+        "reason": "Click the 'Add to cart' button for Sauce Labs Bolt T-Shirt.",
+        "selector": "[data-test='add-to-cart-sauce-labs-bolt-t-shirt']"
+      },
+      {
+        "type": "click",
+        "reason": "Clicking the shopping cart icon to view the cart contents.",
+        "selector": "[data-test='shopping-cart-link']"
+      },
+      {
+        "type": "done",
+        "reason": "Verified that 'Sauce Labs Bolt T-Shirt' is the only item in the cart."
+      }
+    ],
+    "timestamp": 1770933730206,
+    "hitCount": 0
+  }
+}

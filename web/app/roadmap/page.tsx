@@ -13,7 +13,6 @@ const phases = [
         dashboardFeatures: [
             'Live Stream Player — Embed a VNC or MJPEG stream of the Playwright browser with action overlays.',
             'The "Thought" Console — A scrolling log showing the AI\'s reasoning chain.',
-            'Snapshot Gallery — Display the "Distilled DOM" JSON alongside the screenshot for the current step.',
         ],
         settings: [
             'Vision Model: Toggle between gemini-2.0-flash (Speed) and gemini-1.5-pro (Reasoning).',

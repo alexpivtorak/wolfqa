@@ -104,7 +104,7 @@ ${contextSection}${diffSection}
       4. **FAILURE**: If you are stuck after 3 attempts, return type="fail".
     `;
 
-        return this.generateAction(prompt, screenshot);
+        return this.generateAction(prompt, screenshot, runId);
     }
 
     async decideChaosAction(screenshot: Buffer, history: string[], profile?: any): Promise<Action> {
@@ -168,7 +168,44 @@ ${contextSection}${diffSection}
         return action;
     }
 
+    private extractFirstJSON(text: string): string | null {
+        let firstBrace = text.indexOf('{');
+        if (firstBrace === -1) return null;
+
+        let count = 0;
+        let lastBrace = -1;
+
+        for (let i = firstBrace; i < text.length; i++) {
+            if (text[i] === '{') count++;
+            if (text[i] === '}') {
+                count--;
+                if (count === 0) {
+                    lastBrace = i;
+                    break;
+                }
+            }
+        }
+
+        if (lastBrace === -1) return null;
+        return text.substring(firstBrace, lastBrace + 1);
+    }
+
+    private repairJSON(json: string): string {
+        try {
+            // Remove trailing commas before closing braces/brackets
+            let repaired = json.replace(/,\s*([}\]])/g, '$1');
+
+            // Fix unescaped newlines in strings (common LLM failure)
+            // This is tricky but we can try to find text between quotes and fix it
+            // For now, let's just handle the trailing comma which is the most common
+            return repaired;
+        } catch {
+            return json;
+        }
+    }
+
     private async generateAction(prompt: string, screenshot: Buffer, runId?: number): Promise<Action> {
+
         // Convert Buffer to base64
         const imagePart = {
             inlineData: {
@@ -188,13 +225,14 @@ ${contextSection}${diffSection}
 
                 console.log('Gemini Response:', text);
 
-                // Extract JSON from potential markdown or text wrapper
-                const jsonMatch = text.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) {
-                    throw new Error("No JSON found in response");
+                // Extract JSON using balanced braces
+                const jsonStr = this.extractFirstJSON(text);
+                if (!jsonStr) {
+                    throw new SyntaxError("No JSON found in response");
                 }
 
-                const parsed = JSON.parse(jsonMatch[0]);
+                const repaired = this.repairJSON(jsonStr);
+                const parsed = JSON.parse(repaired);
 
                 // Handle both old format (direct Action) and new format ({ thought, action })
                 const action = (parsed.action ? parsed.action : parsed) as Action;
@@ -218,14 +256,34 @@ ${contextSection}${diffSection}
             } catch (error: any) {
                 console.error(`VisionBrain Error (Attempts left: ${retries}):`, error);
 
-                if (error.message?.includes('429') || error.status === 429) {
-                    console.log(`⏳ Rate limited. Waiting ${delay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // Exponential backoff
+                if (error.message?.includes('429') || error.status === 429 || error instanceof SyntaxError || error.message?.includes('JSON')) {
+                    const isRateLimit = error.message?.includes('429') || error.status === 429;
+                    const errorType = isRateLimit ? 'Rate limited' : 'Parse error';
+                    const rateLimitMsg = `⏳ ${errorType}. Waiting ${isRateLimit ? delay : 500}ms... (Attempts left: ${retries})`;
+                    console.log(rateLimitMsg);
+                    if (runId) {
+                        redis.publish('wolfqa-events', JSON.stringify({
+                            runId,
+                            type: 'log',
+                            message: `⚠️ ${rateLimitMsg}`,
+                            timestamp: new Date()
+                        }));
+                    }
+                    await new Promise(resolve => setTimeout(resolve, isRateLimit ? delay : 500));
+                    if (isRateLimit) delay *= 2; // Exponential backoff for rate limits
                     retries--;
                 } else {
+                    const errMsg = `Brain error: ${error.message}`;
+                    if (runId) {
+                        redis.publish('wolfqa-events', JSON.stringify({
+                            runId,
+                            type: 'log',
+                            message: `❌ ${errMsg}`,
+                            timestamp: new Date()
+                        }));
+                    }
                     // Non-retriable error
-                    return { type: 'wait', duration: 2000, reason: `Brain error: ${error.message}` };
+                    return { type: 'wait', duration: 2000, reason: errMsg };
                 }
             }
         }

@@ -3,7 +3,7 @@ export interface Run {
     id: number;
     url: string;
     goal: string;
-    status: 'queued' | 'running' | 'completed' | 'failed';
+    status: 'queued' | 'running' | 'completed' | 'failed' | 'stopping' | 'stopped';
     result: 'pass' | 'fail' | null;
     videoUrl?: string; // e.g. /videos/run-123.webm
     createdAt: string;
@@ -42,4 +42,12 @@ export async function getRun(id: string): Promise<Run & { steps: Step[] }> {
 
 export function getStreamUrl(runId: string) {
     return `${API_BASE}/stream/${runId}`;
+}
+
+export async function stopRun(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/runs/${id}/stop`, {
+        method: 'POST'
+    });
+    if (!res.ok) throw new Error('Failed to stop run');
+    return res.json();
 }

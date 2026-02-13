@@ -22,8 +22,6 @@ This document outlines the evolutionary stages of WolfQA, moving from a single-p
 * **The "Thought" Console:**
     * A scrolling log (like a terminal) showing the *Reasoning Chain*.
     * *Example:* `[THINKING] "I see a popup. ID: #promo-modal. Strategy: Close it."`
-* **Snapshot Gallery:**
-    * Display the "Distilled DOM" JSON alongside the screenshot for the current step.
 
 ### ⚙️ Settings (Configuration)
 * **Vision Model:** Toggle between `gemini-2.0-flash` (Speed) and `gemini-1.5-pro` (Reasoning).
