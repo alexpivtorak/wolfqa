@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ExternalLink, Terminal, Camera, Zap, Video, Square } from 'lucide-react';
+import { ExternalLink, Terminal, Camera, Zap, Video, Square, Copy, Check } from 'lucide-react';
 import { VideoPlayer } from '@/components/video-player';
 
 import {
@@ -38,6 +38,14 @@ export default function RunPage() {
     const [status, setStatus] = useState('connecting');
     const [liveFrame, setLiveFrame] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyLogs = () => {
+        const text = logs.map(l => `[${new Date(l.timestamp).toLocaleTimeString()}] ${l.type.toUpperCase()}: ${l.message}`).join('\n');
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     // Re-run state
     const [isRerunOpen, setIsRerunOpen] = useState(false);
@@ -302,10 +310,19 @@ export default function RunPage() {
 
                 {/* Right: Thought Console & Logs */}
                 <Card className="flex flex-col h-full bg-black text-green-400 font-mono text-sm border-zinc-800 shadow-2xl overflow-hidden">
-                    <CardHeader className="border-b border-zinc-800 bg-zinc-900/50 py-3 shrink-0">
+                    <CardHeader className="border-b border-zinc-800 bg-zinc-900/50 py-3 shrink-0 flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-green-500 flex items-center gap-2 text-base">
                             <Terminal className="w-4 h-4" /> THOUGHT CONSOLE
                         </CardTitle>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                            onClick={handleCopyLogs}
+                            title="Copy logs to clipboard"
+                        >
+                            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        </Button>
                     </CardHeader>
                     <div className="flex-1 min-h-0 overflow-y-auto p-4" ref={scrollRef}>
                         <div className="space-y-1.5">

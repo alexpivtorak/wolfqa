@@ -4,6 +4,7 @@ import { VisionBrain } from '../agent/VisionBrain.js';
 import { Observer } from '../agent/Observer.js';
 import { HistoryManager } from '../agent/HistoryManager.js';
 import { ActionCache } from '../agent/ActionCache.js';
+import { Optimizer } from '../agent/Optimizer.js';
 import { db } from '../db/index.js';
 import { testRuns, issues } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -24,7 +25,7 @@ const connection = {
 
 const worker = new Worker('test-queue', async (job: Job) => {
     // Support both single goal and multi-step flow
-    const { url, goal, flow, testRunId, mode, chaosProfile, model, headless } = job.data;
+    const { url, goal, flow, testRunId, mode, chaosProfile, model, headless, disableCache } = job.data;
     // flow: TestFlow | undefined
 
     const testName = flow ? flow.name : goal;
@@ -129,7 +130,8 @@ const worker = new Worker('test-queue', async (job: Job) => {
             const cachedActions = actionCache.get(currentUrl, currentStep.name, currentStep.goal);
 
             // Disable cache in Chaos Mode to avoid replaying "happy path"
-            if (mode !== 'chaos' && cachedActions && cachedActions.length > 0) {
+            // Also disable if user explicitly requested it
+            if (mode !== 'chaos' && !disableCache && cachedActions && cachedActions.length > 0) {
                 console.log(`⚡ Attempting ${cachedActions.length} cached actions for step "${currentStep.name}"`);
                 try {
                     // Take a screenshot per step or every few actions to keep the live feed alive
@@ -156,7 +158,13 @@ const worker = new Worker('test-queue', async (job: Job) => {
                             timestamp: new Date()
                         }));
 
-                        await browser.executeAction(action);
+                        // Check if we should stop
+                        const [run] = await db.select().from(testRuns).where(eq(testRuns.id, testRunId)).execute();
+                        if (run?.status === 'stopping') {
+                            throw new Error('Mission stopped by user');
+                        }
+
+                        await browser.executeActions([action]);
 
                         // Small wait to ensure stability
                         await browser.page?.waitForTimeout(500);
@@ -228,9 +236,10 @@ const worker = new Worker('test-queue', async (job: Job) => {
                     timestamp: new Date()
                 }));
 
-                let action: Action;
+                let actions: Action[];
                 if (mode === 'chaos') {
-                    action = await brain.decideChaosAction(screenshot, history.getFullLog(), chaosProfile);
+                    const response = await brain.decideChaosAction(screenshot, history.getFullLog(), chaosProfile);
+                    actions = response.actions;
                 } else {
                     const promptHistory = history.getPromptHistory();
 
@@ -241,70 +250,71 @@ const worker = new Worker('test-queue', async (job: Job) => {
                     // Get current DOM diff feedback
                     const domDiff = await browser.getDOMDiff();
 
-                    action = await brain.decideAction(screenshot, currentStep.goal, [optimizedHistory], pageContext, domDiff.summary, testRunId);
+                    const response = await brain.decideAction(screenshot, currentStep.goal, [optimizedHistory], pageContext, domDiff.summary, testRunId);
+                    actions = response.actions;
                 }
 
-                stepActions.push(action); // Record action (including done/fail)
+                stepActions.push(...actions); // Record actions
 
-                // Enhanced History Logging for Level 3 Intelligence
-                let details = '';
-                if (action.coordinate) details += ` Coord=(${action.coordinate.x},${action.coordinate.y})`;
-                if (action.selector) details += ` Sel="${action.selector}"`;
-                if (action.text) details += ` Text="${action.text}"`;
-                if (action.key) details += ` Key="${action.key}"`;
+                for (const action of actions) {
+                    // Enhanced History Logging for Level 3 Intelligence
+                    let details = '';
+                    if (action.coordinate) details += ` Coord=(${action.coordinate.x},${action.coordinate.y})`;
+                    if (action.selector) details += ` Sel="${action.selector}"`;
+                    if (action.text) details += ` Text="${action.text}"`;
+                    if (action.key) details += ` Key="${action.key}"`;
 
-                const actionLogMsg = `👉 Action: ${action.type}${details} (${action.reason || ''})`;
-                redis.publish('wolfqa-events', JSON.stringify({
-                    runId: testRunId,
-                    type: 'log',
-                    message: actionLogMsg,
-                    timestamp: new Date()
-                }));
-                // Record action and wait for execution results to get outcome for the next turn
-                // Outcome will be captured in the NEXT iteration via DOM Diff
-                // (Wait, we can't record the outcome BEFORE we execute it, so we'll record the Action now)
-                // history.record(action, "Executing...", i + 1); // HistoryManager doesn't have a placeholder state, so we just wait
+                    const actionLogMsg = `👉 Action: ${action.type}${details} (${action.reason || ''})`;
+                    redis.publish('wolfqa-events', JSON.stringify({
+                        runId: testRunId,
+                        type: 'log',
+                        message: actionLogMsg,
+                        timestamp: new Date()
+                    }));
 
-                if (action.type === 'done') {
-                    // Cache successful actions (excluding the 'done' action itself if preferred, but keeping it is fine)
+                    if (action.type === 'fail') {
+                        if (mode === 'chaos') {
+                            throw new Error(`Chaos crash at step ${currentStep.name}: ${action.reason}`);
+                        }
+                        throw new Error(`Failed at step ${currentStep.name}: ${action.reason}`);
+                    }
+                }
 
+                // Check for 'done' in the batch
+                const doneAction = actions.find(a => a.type === 'done');
+                if (doneAction) {
                     if (mode === 'chaos') {
-                        // In Chaos mode, "done" means we decided to stop this step (maybe looped enough)
-                        // It doesn't necessarily mean "goal reached", but "no crash occurred".
                         stepSuccess = true;
                         break;
                     }
 
-                    // We only cache if we actually did something useful
                     if (stepActions.length > 1) {
-                        // Use the URL from start of step (approx)
-                        actionCache.set(currentUrl, currentStep.name, currentStep.goal, stepActions);
+                        const optimizedActions = Optimizer.optimizeActions(stepActions);
+                        actionCache.set(currentUrl, currentStep.name, currentStep.goal, optimizedActions);
                     }
                     stepSuccess = true;
                     break;
                 }
 
-                if (action.type === 'fail') {
-                    if (mode === 'chaos') {
-                        throw new Error(`Chaos crash at step ${currentStep.name}: ${action.reason}`);
-                    }
-                    throw new Error(`Failed at step ${currentStep.name}: ${action.reason}`);
+                try {
+                    await browser.executeActions(actions);
+                } catch (e: any) { // Catch action failure and stop loop
+                    throw new Error(`Action Execution Failed: ${e.message}`);
                 }
 
-                await browser.executeAction(action);
-
-                // Wait for page to stabilize after action (prevents screenshot errors during navigation)
+                // Wait for page to stabilize after action batch
                 try {
                     await browser.page?.waitForLoadState('domcontentloaded', { timeout: 3000 });
                 } catch { }
 
-                // Record state in Observer
+                // Record state in Observer (just use last known URL)
                 const currentUrlObs = browser.page?.url() || '';
-                observer.recordState(currentUrlObs, action);
+                observer.recordState(currentUrlObs, actions[actions.length - 1]); // Record the last action of the batch
 
                 // Record in history with the diff outcome
                 const postActionDiff = await browser.getDOMDiff();
-                history.record(action, postActionDiff.summary, i + 1);
+                // Record the "batch" consequence
+                history.record(actions[actions.length - 1], postActionDiff.summary, i + 1);
 
                 // Check for stuck states
                 const intervention = observer.validateProgress();

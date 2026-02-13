@@ -25,7 +25,7 @@ export class VisionBrain {
         this.model = this.genAI.getGenerativeModel({ model: selectedModel });
     }
 
-    async decideAction(screenshot: Buffer, goal: string, history: string[], pageContext?: string, domDiff?: string, runId?: number): Promise<Action> {
+    async decideAction(screenshot: Buffer, goal: string, history: string[], pageContext?: string, domDiff?: string, runId?: number): Promise<{ thought: string, actions: Action[] }> {
         const contextSection = pageContext ? `
       
       PAGE CONTEXT (Distilled DOM):
@@ -107,7 +107,7 @@ ${contextSection}${diffSection}
         return this.generateAction(prompt, screenshot, runId);
     }
 
-    async decideChaosAction(screenshot: Buffer, history: string[], profile?: any): Promise<Action> {
+    async decideChaosAction(screenshot: Buffer, history: string[], profile?: any): Promise<{ thought: string, actions: Action[] }> {
         const prompt = `
       You are an Expert QA Penetration Tester. Your goal is NOT to complete the purchase successfully. Your goal is to crash the application, trigger error messages, or find logic loopholes.
 
@@ -123,11 +123,16 @@ ${contextSection}${diffSection}
       Analyze the screenshot. Determine the next chaotic step.
       Return ONLY a JSON object with the following structure:
       {
-        "type": "click" | "rage_click" | "type" | "scroll" | "wait" | "navigate" | "done" | "fail",
-        "reason": "short explanation of the chaos strategy",
-        "selector": "css selector (optional)",
-        "coordinate": { "x": 123, "y": 456 } (optional),
-        "text": "text to type" (optional)
+        "thought": "I will try to inject SQL into the username field",
+        "actions": [
+            {
+                "type": "click" | "rage_click" | "type" | "scroll" | "wait" | "navigate" | "done" | "fail",
+                "reason": "short explanation of the chaos strategy",
+                "selector": "css selector (optional)",
+                "coordinate": { "x": 123, "y": 456 } (optional),
+                "text": "text to type" (optional)
+            }
+        ]
       }
       
       Rules:
@@ -136,36 +141,39 @@ ${contextSection}${diffSection}
       3. Do not wrap result in markdown blocks. Just raw JSON.
     `;
 
-        const action = await this.generateAction(prompt, screenshot);
+        const response = await this.generateAction(prompt, screenshot);
+        const actions = response.actions;
 
         // --- NASTY STRING INJECTION ---
         // Overwrite text with nasty strings 50% of the time, or if the model specifically requested a placeholder
         // RESPECT PROFILE: Only inject if profile.injection is true (or undefined/standard)
         const shouldParams = profile?.injection ?? true;
 
-        if (shouldParams && action.type === 'type') {
-            const NASTY_STRINGS = [
-                "' OR 1=1--",                // SQL Injection
-                "<script>alert(1)</script>", // XSS
-                "😀😃😄😁😆😅😂🤣",           // Emojis
-                "A".repeat(1000),            // Buffer Overflow / Long Text
-                "-1",                        // Negative Numbers
-                "0",                         // Zero
-                "undefined",                 // JS primitives
-                "null",
-                "{{7*7}}",                   // SSTI
-                "../../etc/passwd"           // Path Traversal
-            ];
+        for (const action of actions) {
+            if (shouldParams && action.type === 'type') {
+                const NASTY_STRINGS = [
+                    "' OR 1=1--",                // SQL Injection
+                    "<script>alert(1)</script>", // XSS
+                    "😀😃😄😁😆😅😂🤣",           // Emojis
+                    "A".repeat(1000),            // Buffer Overflow / Long Text
+                    "-1",                        // Negative Numbers
+                    "0",                         // Zero
+                    "undefined",                 // JS primitives
+                    "null",
+                    "{{7*7}}",                   // SSTI
+                    "../../etc/passwd"           // Path Traversal
+                ];
 
-            const shouldInject = Math.random() < 0.5 || action.text?.includes("NASTY") || !action.text;
-            if (shouldInject) {
-                const randomString = NASTY_STRINGS[Math.floor(Math.random() * NASTY_STRINGS.length)];
-                action.text = randomString;
-                action.reason = (action.reason || "") + ` [Injected Nasty String: ${randomString}]`;
+                const shouldInject = Math.random() < 0.5 || action.text?.includes("NASTY") || !action.text;
+                if (shouldInject) {
+                    const randomString = NASTY_STRINGS[Math.floor(Math.random() * NASTY_STRINGS.length)];
+                    action.text = randomString;
+                    action.reason = (action.reason || "") + ` [Injected Nasty String: ${randomString}]`;
+                }
             }
         }
 
-        return action;
+        return response;
     }
 
     private extractFirstJSON(text: string): string | null {
@@ -204,7 +212,7 @@ ${contextSection}${diffSection}
         }
     }
 
-    private async generateAction(prompt: string, screenshot: Buffer, runId?: number): Promise<Action> {
+    private async generateAction(prompt: string, screenshot: Buffer, runId?: number): Promise<{ thought: string, actions: Action[] }> {
 
         // Convert Buffer to base64
         const imagePart = {
@@ -252,7 +260,7 @@ ${contextSection}${diffSection}
                     redis.publish('wolfqa-events', JSON.stringify({ runId, type: 'step', action, timestamp: new Date() }));
                 }
 
-                return action;
+                return { thought: parsed.thought, actions: parsed.actions || [action] };
             } catch (error: any) {
                 console.error(`VisionBrain Error (Attempts left: ${retries}):`, error);
 
@@ -283,11 +291,11 @@ ${contextSection}${diffSection}
                         }));
                     }
                     // Non-retriable error
-                    return { type: 'wait', duration: 2000, reason: errMsg };
+                    return { thought: "Error", actions: [{ type: 'wait', duration: 2000, reason: errMsg }] };
                 }
             }
         }
 
-        return { type: 'wait', duration: 5000, reason: 'Brain freeze (rate limited)' };
+        return { thought: "Rate Limit Exceeded", actions: [{ type: 'wait', duration: 5000, reason: 'Brain freeze (rate limited)' }] };
     }
 }

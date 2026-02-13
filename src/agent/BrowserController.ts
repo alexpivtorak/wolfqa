@@ -738,9 +738,28 @@ export class BrowserController {
         }
     }
 
-    async executeAction(action: Action) {
+    async executeActions(actions: Action | Action[]) {
         if (!this.page) throw new Error('Session not started');
 
+        const actionList = Array.isArray(actions) ? actions : [actions];
+
+        console.log(`Executing batch of ${actionList.length} actions...`);
+
+        for (let i = 0; i < actionList.length; i++) {
+            const action = actionList[i];
+            console.log(`Executing action ${i + 1}/${actionList.length}: ${action.type}`, action);
+
+            // Execute the single action logic
+            await this.executeSingleAction(action);
+
+            // Crucial safety delay between actions (except for the last one)
+            if (i < actionList.length - 1) {
+                await this.page.waitForTimeout(500);
+            }
+        }
+    }
+
+    private async executeSingleAction(action: Action) {
         console.log(`Executing action: ${action.type}`, action);
 
         try {
@@ -775,15 +794,15 @@ export class BrowserController {
                     // This handles cases like Google's autocomplete overlay hiding the search button
                     if (!clickSucceeded) {
                         console.log('🔄 Click failed - trying Enter key as fallback');
-                        await this.page.keyboard.press('Enter');
-                        await this.page.waitForTimeout(500);
+                        await this.page?.keyboard.press('Enter');
+                        await this.page?.waitForTimeout(500);
                     }
 
                     // Smart wait: navigation OR timeout
                     try {
                         await Promise.race([
-                            this.page.waitForNavigation({ timeout: 8000 }),
-                            this.page.waitForTimeout(3000)
+                            this.page?.waitForNavigation({ timeout: 8000 }),
+                            this.page?.waitForTimeout(3000)
                         ]);
                     } catch (e) {
                         // Navigation timeout is OK (might be SPA)
@@ -795,30 +814,41 @@ export class BrowserController {
                     if (action.selector) {
                         await this.hoverElement(action.selector);
                     } else if (action.coordinate) {
-                        await this.page.mouse.move(action.coordinate.x, action.coordinate.y);
-                        await this.page.waitForTimeout(300);
+                        await this.page?.mouse.move(action.coordinate.x, action.coordinate.y);
+                        await this.page?.waitForTimeout(300);
                     }
                     break;
 
                 case 'type':
-                    if (action.coordinate) {
+                    if (action.coordinate && action.text) {
                         await this.clickAtCoordinate(action.coordinate.x, action.coordinate.y);
-                        await this.page.waitForTimeout(500); // Wait for focus
-                        await this.page.keyboard.type(action.text!);
+                        await this.page?.waitForTimeout(500); // Wait for focus
+                        await this.page?.keyboard.type(action.text);
                     } else if (action.selector && action.text) {
                         await this.fillWithRetry(action.selector, action.text);
                     } else if (action.text) {
-                        // Just type into focused element (risky)
                         console.warn('Typing without selector or coordinate');
-                        await this.page.keyboard.type(action.text);
+                        await this.page?.keyboard.type(action.text);
                     }
+
+                    // FIX: Trigger blur to ensure change events fire immediately
+                    // This prevents the "WolfWolf" race condition where validation hasn't run yet
+                    if (action.selector) {
+                        try {
+                            const escapedSelector = this.escapeSelector(action.selector);
+                            await this.page?.locator(escapedSelector).first().blur({ timeout: 1000 }).catch(() => { });
+                        } catch { }
+                    }
+
+                    // Give the UI a tiny moment to react to the blur/change event
+                    await this.page?.waitForTimeout(100);
                     break;
 
                 case 'keypress':
                     if (action.key) {
                         console.log(`⌨️ Pressing key: ${action.key}`);
-                        await this.page.keyboard.press(action.key);
-                        await this.page.waitForTimeout(500);
+                        await this.page?.keyboard.press(action.key);
+                        await this.page?.waitForTimeout(500);
                     }
                     break;
 
@@ -826,28 +856,28 @@ export class BrowserController {
                     // Scroll down by default or to specific element
                     if (action.selector && !action.selector.includes('document.')) {
                         try {
-                            const element = this.page.locator(action.selector);
-                            await element.scrollIntoViewIfNeeded({ timeout: 3000 });
+                            const element = this.page?.locator(action.selector);
+                            await element?.scrollIntoViewIfNeeded({ timeout: 3000 });
                         } catch (e) {
                             console.log('Scroll to element failed, scrolling page instead');
-                            await this.page.evaluate(() => window.scrollBy(0, 500));
+                            await this.page?.evaluate(() => window.scrollBy(0, 500));
                         }
                     } else {
                         // Scroll page - check if "bottom" intent
                         const scrollAmount = action.reason?.toLowerCase().includes('bottom') ? 10000 : 300;
 
                         // Safety check: Don't scroll if we're already at the bottom
-                        const canScroll = await this.page.evaluate(() => {
+                        const canScroll = await this.page?.evaluate(() => {
                             return (window.innerHeight + window.scrollY) < document.body.scrollHeight;
                         });
 
                         if (canScroll) {
-                            await this.page.evaluate((amt) => window.scrollBy(0, amt), scrollAmount);
+                            await this.page?.evaluate((amt) => window.scrollBy(0, amt), scrollAmount);
                         } else {
                             console.log('🚫 Cannot scroll further, reached bottom of page');
                         }
                     }
-                    await this.page.waitForTimeout(300);
+                    await this.page?.waitForTimeout(300);
                     break;
 
                 case 'rage_click':
@@ -861,7 +891,7 @@ export class BrowserController {
                     break;
 
                 case 'wait':
-                    await this.page.waitForTimeout(action.duration || 2000);
+                    await this.page?.waitForTimeout(action.duration || 2000);
                     break;
 
                 case 'navigate':

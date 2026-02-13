@@ -1,32 +1,24 @@
 [
     {
-        "id": "sauce-flow",
-        "name": "SauceDemo Full E2E Flow",
+        "id": "sauce-nav-flow",
+        "name": "SauceDemo Nav-Oriented Flow",
         "url": "https://www.saucedemo.com",
         "steps": [
             {
-                "name": "Login",
-                "goal": "Login with user 'standard_user' and password 'secret_sauce'"
+                "name": "1. Login",
+                "goal": "Login with 'standard_user' & 'secret_sauce'. Verify we land on the inventory page."
             },
             {
-                "name": "Sort",
-                "goal": "Sort the products by 'Price (high to low)' using the dropdown"
+                "name": "2. Cart Prep",
+                "goal": "Add 'Sauce Labs Backpack' and 'Sauce Labs Bike Light' to the cart. Then click the shopping cart icon. Verify we are on the Cart page."
             },
             {
-                "name": "Add Items",
-                "goal": "Add the first two most expensive items to the cart"
+                "name": "3. Checkout & Data",
+                "goal": "Click 'Checkout'. Fill the form (First='Wolf', Last='QA', Zip='90210'). Click 'Continue'. Verify we are on the 'Checkout: Overview' page."
             },
             {
-                "name": "Remove Item",
-                "goal": "Go to the cart and remove the 'Sauce Labs Onesie' (or the cheaper item) from the list"
-            },
-            {
-                "name": "Checkout Info",
-                "goal": "Click Checkout and fill the form (First: 'John', Last: 'Doe', Zip: '12345'), then click Continue"
-            },
-            {
-                "name": "Finalize",
-                "goal": "Click Finish and verify the 'Thank you for your order!' message appeared"
+                "name": "4. Final Purchase",
+                "goal": "Click 'Finish'. Verify the text 'Thank you for your order' is visible. (This step allows non-navigation success if the observer supports text assertions)."
             }
         ]
     },

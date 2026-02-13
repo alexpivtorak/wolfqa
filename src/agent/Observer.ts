@@ -148,14 +148,12 @@ export class Observer {
         const current = this.snapshots[this.snapshots.length - 1];
         const beforeStep = this.snapshots[0]; // URL when step started
 
-        // Generic validation: URL should change for navigation-heavy steps
-        if (stepName.toLowerCase().includes('login') ||
-            stepName.toLowerCase().includes('checkout') ||
-            stepName.toLowerCase().includes('navigate')) {
+        // Logic updated per user request: only enforce navigation if the goal explicitly mentions it.
+        const goalImpliesNavigation = stepName.toLowerCase().includes("go to") ||
+            stepName.toLowerCase().includes("navigate");
 
-            if (current.url === beforeStep.url) {
-                return `STEP_FAILED: "${stepName}" did not result in navigation. Still on ${current.url}`;
-            }
+        if (goalImpliesNavigation && current.url === beforeStep.url) {
+            return `STEP_FAILED: "${stepName}" did not result in navigation. Still on ${current.url}`;
         }
 
         return null;

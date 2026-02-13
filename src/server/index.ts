@@ -118,7 +118,7 @@ app.post('/api/runs/:id/stop', async (c) => {
 
 // Create a new run (Trigger Job)
 app.post('/api/jobs', async (c) => {
-    const { url, goal, mode, chaosProfile, model, headless } = await c.req.json();
+    const { url, goal, mode, chaosProfile, model, headless, disableCache } = await c.req.json();
 
     if (!url || !goal) return c.json({ error: 'Missing url or goal' }, 400);
 
@@ -149,7 +149,8 @@ app.post('/api/jobs', async (c) => {
         mode,
         chaosProfile,
         model: model || 'gemini-2.0-flash',
-        headless: headless !== false // Default true
+        headless: headless !== false, // Default true
+        disableCache: disableCache === true
     });
 
     await queue.close();

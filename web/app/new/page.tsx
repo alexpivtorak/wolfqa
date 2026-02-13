@@ -48,6 +48,7 @@ PHASE 3: FINISH
     const [chaosProfile, setChaosProfile] = useState<ChaosProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [headless, setHeadless] = useState(true);
+    const [disableCache, setDisableCache] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,6 +67,7 @@ PHASE 3: FINISH
                     chaosProfile: isChaos ? chaosProfile : undefined,
                     model,
                     headless,
+                    disableCache,
                 }),
             });
 
@@ -166,6 +168,22 @@ PHASE 3: FINISH
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
                                     Run the browser without a visible window. Disable to watch the agent live on your machine.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 border p-4 rounded-lg bg-muted/50">
+                            <Switch
+                                id="disable-cache"
+                                checked={disableCache}
+                                onCheckedChange={setDisableCache}
+                            />
+                            <div className="flex-1">
+                                <Label htmlFor="disable-cache" className="font-bold">
+                                    Disable Action Cache 🧠
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Force the agent to think through every step instead of using cached actions from previous successful runs.
                                 </p>
                             </div>
                         </div>
