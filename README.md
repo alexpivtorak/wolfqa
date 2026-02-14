@@ -33,7 +33,7 @@ It operates on a `Job Queue` architecture, making it suitable for B2B deployment
 Clone the repo and install dependencies:
 
 ```bash
-npm install
+pnpm install
 npx playwright install
 ```
 
@@ -45,25 +45,29 @@ DATABASE_URL=postgres://wolfqa:securepassword@127.0.0.1:5433/wolfqa_db
 REDIS_URL=redis://127.0.0.1:6379
 ```
 
-### 2. Start Infrastructure
-Start the Database and Queue:
+### 2. Start Everything
+The easiest way to start the entire ecosystem (Infra, API, Worker, and Web Dashboard):
 
 ```bash
-docker-compose up -d postgres redis
+# Start all services (Postgres, Redis, API, Worker, Web)
+pnpm run up
+
+# Run database migrations (first time only)
+pnpm run db:push
 ```
 
-Run database migrations:
+---
 
-```bash
-npm run db:push
-```
+## 🛠️ Maintenance & Utility Scripts
 
-### 3. Start the Worker
-In a separate terminal, start the agent worker:
-
-```bash
-npm run start:worker
-```
+| Command | Description |
+| :--- | :--- |
+| `pnpm run up` | 🚀 **Recommended**. Starts Infra + API + Worker + Front-end. |
+| `pnpm run dev:all` | Starts API + Worker + Front-end (Infra must be running). |
+| `pnpm run infra:up` | Starts Postgres & Redis containers only. |
+| `pnpm run infra:down` | Stops all containers. |
+| `pnpm run clean` | 🧹 **Cleanup**. Deletes all artifacts and clears the action cache. |
+| `pnpm run kill:all` | Forcefully kills all running Node.js processes. |
 
 ### 4. Trigger a Test
 In another terminal, send a job to the queue:

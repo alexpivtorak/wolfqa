@@ -20,6 +20,13 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
     "lint": "eslint .",
+    "infra:up": "docker-compose up -d postgres redis",
+    "infra:down": "docker-compose down",
+    "dev:all": "concurrently -n \"API,WRK,FE\" -c \"bgBlue,bgGreen,bgMagenta\" \"pnpm run start:server\" \"pnpm run start:worker\" \"pnpm --prefix web run dev\"",
+    "up": "pnpm run infra:up && pnpm run dev:all",
+    "clean:artifacts": "rm -rf artifacts/*",
+    "clean:cache": "rm -f cache/action_cache.json",
+    "clean": "pnpm run clean:artifacts && pnpm run clean:cache",
     "kill:all": "cmd /c \"taskkill /F /IM node.exe /T || exit 0\""
   },
   "keywords": [
@@ -47,6 +54,7 @@
   "devDependencies": {
     "@types/node": "^20.12.7",
     "@types/pg": "^8.11.5",
+    "concurrently": "^9.2.1",
     "drizzle-kit": "^0.20.14",
     "tsx": "^4.7.2",
     "typescript": "^5.4.5"
